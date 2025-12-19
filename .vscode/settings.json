@@ -1,0 +1,22 @@
+{
+  "factorio.versions": [
+    {
+      "name": "Steam",
+      "factorioPath": "d:\\SteamLibrary\\steamapps\\common\\Factorio\\bin\\x64\\factorio.exe"
+    }
+  ],
+  "Lua.workspace.userThirdParty": [
+    "c:\\Users\\wcjoh\\AppData\\Roaming\\Code\\User\\workspaceStorage\\598d746249b6058fd06bfc93d9b35132\\justarandomgeek.factoriomod-debug\\sumneko-3rd"
+  ],
+  "Lua.workspace.checkThirdParty": "ApplyInMemory",
+  "Lua.workspace.ignoreSubmodules": false,
+  "Lua.workspace.library": [
+        "c:/dev/factorio/0-things/types.lua",
+    "c:/dev/factorio/0-things/remote-interface.lua"
+  ],
+    "[lua]": {
+    "editor.defaultFormatter": "JohnnyMorganz.stylua",
+    "editor.formatOnSave": true
+  },
+  "stylua.targetReleaseVersion": "latest"
+}
