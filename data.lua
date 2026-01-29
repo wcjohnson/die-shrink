@@ -36,55 +36,53 @@ local ic_registration = {
 	custom_events = {
 		on_initialized = "die-shrink-on_initialized",
 		on_status = "die-shrink-on_status",
-		on_edge_status = "die-shrink-on_edge_status",
 		on_children_normalized = "die-shrink-on_children_normalized",
 		on_orientation_changed = "die-shrink-on_orientation_changed",
 	},
 	children = {
-		[1] = {
+		["1"] = {
 			create = { name = "die-shrink-pin", position = { 0, 0 } },
 			offset = { 0, -PIN_OFFSET },
 			lifecycle_type = "real-real",
 		},
-		[2] = {
+		["2"] = {
 			create = { name = "die-shrink-pin", position = { 0, 0 } },
 			offset = { PIN_OFFSET, -PIN_OFFSET },
 			lifecycle_type = "real-real",
 		},
-		[3] = {
+		["3"] = {
 			create = { name = "die-shrink-pin", position = { 0, 0 } },
 			offset = { PIN_OFFSET, 0 },
 			lifecycle_type = "real-real",
 		},
-		[4] = {
+		["4"] = {
 			create = { name = "die-shrink-pin", position = { 0, 0 } },
 			offset = { PIN_OFFSET, PIN_OFFSET },
 			lifecycle_type = "real-real",
 		},
-		[5] = {
+		["5"] = {
 			create = { name = "die-shrink-pin", position = { 0, 0 } },
 			offset = { 0, PIN_OFFSET },
 			lifecycle_type = "real-real",
 		},
-		[6] = {
+		["6"] = {
 			create = { name = "die-shrink-pin", position = { 0, 0 } },
 			offset = { -PIN_OFFSET, PIN_OFFSET },
 			lifecycle_type = "real-real",
 		},
-		[7] = {
+		["7"] = {
 			create = { name = "die-shrink-pin", position = { 0, 0 } },
 			offset = { -PIN_OFFSET, 0 },
 			lifecycle_type = "real-real",
 		},
-		[8] = {
+		["8"] = {
 			create = { name = "die-shrink-pin", position = { 0, 0 } },
 			offset = { -PIN_OFFSET, -PIN_OFFSET },
 			lifecycle_type = "real-real",
 		},
 	},
 }
-data.raw["mod-data"]["things-names"].data["die-shrink-mux"] =
-	ic_registration
+data.raw["mod-data"]["things-names"].data["die-shrink-ic"] = ic_registration
 
 ---@type things.ThingRegistration
 local pin_registration = {
@@ -100,5 +98,4 @@ local pin_registration = {
 		on_immediate_voided = "die-shrink-on_pin_immediate_voided",
 	},
 }
-data.raw["mod-data"]["things-names"].data["die-shrink-pin"] =
-	pin_registration
+data.raw["mod-data"]["things-names"].data["die-shrink-pin"] = pin_registration
