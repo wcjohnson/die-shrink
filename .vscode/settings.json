@@ -11,7 +11,7 @@
   "Lua.workspace.checkThirdParty": "ApplyInMemory",
   "Lua.workspace.ignoreSubmodules": false,
   "Lua.workspace.library": [
-        "c:/dev/factorio/0-things/types.lua",
+    "c:/dev/factorio/0-things/types.lua",
     "c:/dev/factorio/0-things/remote-interface.lua"
   ],
     "[lua]": {
