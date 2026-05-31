@@ -1,0 +1,34 @@
+local ps_lib = require("control.player-state")
+
+---@class DieShrink.Storage
+---@field players {[uint]: DieShrink.PlayerState}
+---@field ics {[int]: DieShrink.IC}
+storage = {}
+
+---@param player_index uint
+---@return DieShrink.PlayerState
+function _G.get_or_create_player_state(player_index)
+	if not storage.players then storage.players = {} end
+	if not storage.players[player_index] then
+		storage.players[player_index] = ps_lib.PlayerState:new(player_index)
+	end
+	return storage.players[player_index]
+end
+
+---@param player_index uint
+---@return DieShrink.PlayerState?
+function _G.get_player_state(player_index)
+	return storage.players and storage.players[player_index]
+end
+
+---@param thing_id int
+---@return DieShrink.IC
+function _G.get_or_create_ic_state(thing_id)
+	if not storage.ics then storage.ics = {} end
+	if not storage.ics[thing_id] then storage.ics[thing_id] = IC:new(thing_id) end
+	return storage.ics[thing_id]
+end
+
+---@param thing_id int
+---@return DieShrink.IC?
+function _G.get_ic_state(thing_id) return storage.ics and storage.ics[thing_id] end

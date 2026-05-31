@@ -7,8 +7,6 @@ require("data.tech")
 data:extend({
 	{ type = "custom-event", name = "die-shrink-on_initialized" },
 	{ type = "custom-event", name = "die-shrink-on_status" },
-	{ type = "custom-event", name = "die-shrink-on_edge_status" },
-	{ type = "custom-event", name = "die-shrink-on_edge_changed" },
 	{ type = "custom-event", name = "die-shrink-on_orientation_changed" },
 	{ type = "custom-event", name = "die-shrink-on_children_normalized" },
 	{ type = "custom-event", name = "die-shrink-on_pin_status" },
@@ -18,15 +16,10 @@ data:extend({
 		name = "die-shrink-click",
 		key_sequence = "mouse-button-1",
 	},
-	{
-		type = "custom-input",
-		name = "die-shrink-linked-clear-cursor",
-		key_sequence = "",
-		linked_game_control = "clear-cursor",
-	},
 })
 
 local PIN_OFFSET = 0.4
+local INNER_PIN_OFFSET = 0.2
 
 ---@type things.ThingRegistration
 local ic_registration = {
@@ -80,6 +73,46 @@ local ic_registration = {
 			offset = { -PIN_OFFSET, -PIN_OFFSET },
 			lifecycle_type = "real-real",
 		},
+		["9"] = {
+			create = { name = "die-shrink-pin", position = { 0, 0 } },
+			offset = { 0, -INNER_PIN_OFFSET },
+			lifecycle_type = "real-real",
+		},
+		["10"] = {
+			create = { name = "die-shrink-pin", position = { 0, 0 } },
+			offset = { INNER_PIN_OFFSET, -INNER_PIN_OFFSET },
+			lifecycle_type = "real-real",
+		},
+		["11"] = {
+			create = { name = "die-shrink-pin", position = { 0, 0 } },
+			offset = { INNER_PIN_OFFSET, 0 },
+			lifecycle_type = "real-real",
+		},
+		["12"] = {
+			create = { name = "die-shrink-pin", position = { 0, 0 } },
+			offset = { INNER_PIN_OFFSET, INNER_PIN_OFFSET },
+			lifecycle_type = "real-real",
+		},
+		["13"] = {
+			create = { name = "die-shrink-pin", position = { 0, 0 } },
+			offset = { 0, INNER_PIN_OFFSET },
+			lifecycle_type = "real-real",
+		},
+		["14"] = {
+			create = { name = "die-shrink-pin", position = { 0, 0 } },
+			offset = { -INNER_PIN_OFFSET, INNER_PIN_OFFSET },
+			lifecycle_type = "real-real",
+		},
+		["15"] = {
+			create = { name = "die-shrink-pin", position = { 0, 0 } },
+			offset = { -INNER_PIN_OFFSET, 0 },
+			lifecycle_type = "real-real",
+		},
+		["16"] = {
+			create = { name = "die-shrink-pin", position = { 0, 0 } },
+			offset = { -INNER_PIN_OFFSET, -INNER_PIN_OFFSET },
+			lifecycle_type = "real-real",
+		},
 	},
 }
 data.raw["mod-data"]["things-names"].data["die-shrink-ic"] = ic_registration
@@ -87,9 +120,6 @@ data.raw["mod-data"]["things-names"].data["die-shrink-ic"] = ic_registration
 ---@type things.ThingRegistration
 local pin_registration = {
 	name = "die-shrink-pin",
-	custom_blueprint_geometry = {
-		[0] = { -0.3, -0.3, 0.09, 0.09 },
-	},
 	intercept_construction = false,
 	no_garbage_collection = true,
 	allow_in_cursor = "never",

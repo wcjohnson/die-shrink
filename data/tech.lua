@@ -14,7 +14,7 @@ local ic_recipe = {
 		{ type = "item", name = "copper-cable", amount = 16 },
 	},
 	results = {
-		{ type = "item", name = constants.mux_name, amount = 1 },
+		{ type = "item", name = constants.ic_name, amount = 1 },
 	},
 }
 
