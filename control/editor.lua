@@ -411,13 +411,13 @@ local function save_editor_session(player_index)
 end
 
 ---@param player LuaPlayer
----@param thing things.ThingSummary
-local function open_editor_for_thing(player, thing)
+---@param ic DieShrink.IC
+local function open_editor_for_ic(player, ic)
 	local editor_sessions = get_editor_sessions()
 	if editor_sessions[player.index] then close_editor_session(player.index) end
 
-	local ic = get_ic_state(thing.id)
-	if not ic then return end
+	local _, thing = remote.call("things", "get", ic.thing_id)
+	if not thing then return end
 
 	local surface = get_or_create_editor_surface(player.index)
 	prepare_surface_for_force(surface, player.force --[[@as LuaForce]])
@@ -445,23 +445,8 @@ local function open_editor_for_thing(player, thing)
 		player.zoom = EDITOR_ENTRY_MIN_ZOOM
 	end
 
-	open_editor_ui(player, ic)
+	event.raise("dieshrink.editor_session_opened", player, ic)
 end
-
-event.bind("die-shrink-click", function(ev)
-	local player = game.get_player(ev.player_index)
-	if not player then return end
-
-	local selected = player.selected
-	if not selected or not selected.valid then return end
-	if selected.name ~= constants.ic_name then return end
-
-	local get_error, thing = remote.call("things", "get", selected)
-	if get_error or not thing or not thing.entity then return end
-	if thing.name ~= constants.ic_name then return end
-
-	open_editor_for_thing(player, thing)
-end)
 
 event.bind(defines.events.on_player_controller_changed, function(ev)
 	local editor_sessions = storage.editor_sessions
@@ -553,6 +538,7 @@ function _G.close_editor_session(player_index)
 	local session = editor_sessions[player_index]
 
 	save_editor_session(player_index)
+	event.raise("dieshrink.editor_session_closed", player_index)
 
 	local player = game.get_player(player_index)
 	if
@@ -564,6 +550,12 @@ function _G.close_editor_session(player_index)
 	end
 
 	player.exit_remote_view()
+end
 
-	event.raise("dieshrink.editor_session_closed", player_index)
+---@param player_index PlayerIndex
+---@param ic DieShrink.IC
+function _G.open_editor_session(player_index, ic)
+	local player = game.get_player(player_index)
+	if not player or not player.valid then return end
+	open_editor_for_ic(player, ic)
 end

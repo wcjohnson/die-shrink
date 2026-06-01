@@ -70,4 +70,9 @@ function _G.open_editor_ui(player, ic)
 	)
 end
 
+event.bind(
+	"dieshrink.editor_session_opened",
+	function(player, ic) open_editor_ui(player, ic) end
+)
+
 return lib

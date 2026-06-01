@@ -15,6 +15,7 @@ local lib = {}
 ---@field player_index uint Index of the player this state belongs to
 ---@field pin_labels? LuaRenderObject[] Pin label rendering objects
 ---@field editor_window_position? GuiLocation Position of the editor window
+---@field ic_window_position? GuiLocation Position of the IC window
 local PlayerState = class("DieShrink.PlayerState")
 lib.PlayerState = PlayerState
 

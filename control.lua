@@ -43,6 +43,7 @@ require("control.storage")
 require("control.editor")
 require("control.pins")
 
+require("control.ui.ic")
 require("control.ui.editor")
 
 -- Enable support for the Global Variable Viewer debugging mod, if it is
