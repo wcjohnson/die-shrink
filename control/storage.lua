@@ -5,8 +5,8 @@ local ps_lib = require("control.player-state")
 ---@alias ThingID int64
 
 ---@class DieShrink.EditorSession
----@field thing_id ThingID
----@field surface_name string
+---@field thing_id ThingID The IC being edited in this session.
+---@field surface_name string The name of the editor surface for this session.
 
 ---@class DieShrink.Storage
 ---@field players {[PlayerIndex]: DieShrink.PlayerState}
@@ -29,14 +29,6 @@ end
 ---@return DieShrink.PlayerState?
 function _G.get_player_state(player_index)
 	return storage.players and storage.players[player_index]
-end
-
----@param thing_id ThingID
----@return DieShrink.IC
-function _G.get_or_create_ic_state(thing_id)
-	if not storage.ics then storage.ics = {} end
-	if not storage.ics[thing_id] then storage.ics[thing_id] = IC:new(thing_id) end
-	return storage.ics[thing_id]
 end
 
 ---@param thing_id ThingID

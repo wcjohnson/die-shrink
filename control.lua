@@ -1,4 +1,8 @@
 local strace = require("lib.core.strace")
+local relm = require("lib.core.relm.relm")
+local event = require("lib.core.event")
+
+relm.bootstrap_with_core_events(event)
 
 local stringify = strace.stringify
 local format_tick_relative =
@@ -38,6 +42,8 @@ require("control.ic")
 require("control.storage")
 require("control.editor")
 require("control.pins")
+
+require("control.ui.editor")
 
 -- Enable support for the Global Variable Viewer debugging mod, if it is
 -- installed.

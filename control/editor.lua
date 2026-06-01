@@ -5,6 +5,7 @@ local strace = require("lib.core.strace")
 local EDITOR_SURFACE_PREFIX = "die-shrink-editor-p-"
 local EDITOR_PANEL_NAME = "die-shrink-editor-panel"
 local EDITOR_EXIT_BUTTON_NAME = "die-shrink-editor-exit"
+local EDITOR_ADD_PAD_BUTTON_NAME = "die-shrink-editor-add-pad"
 local EDITOR_SIZE = 64
 local EDITOR_ENTRY_MIN_ZOOM = 0.75
 local EDITOR_ENERGY_SOURCE_NAME = constants.mod_prefix
@@ -27,6 +28,7 @@ local ALLOWED_ENTITY_NAMES = {
 	["arithmetic-combinator"] = true,
 	["decider-combinator"] = true,
 	["selector-combinator"] = true,
+	[constants.pad_name] = true,
 }
 
 local EDITOR_SYSTEM_ENTITY_NAMES = {
@@ -70,43 +72,17 @@ local function is_editor_surface(surface)
 end
 
 ---@param player LuaPlayer
-local function close_editor_panel(player)
-	local panel = player.gui.left[EDITOR_PANEL_NAME]
-	if panel then panel.destroy() end
-end
-
----@param player LuaPlayer
-local function open_editor_panel(player)
-	close_editor_panel(player)
-
-	local outer = player.gui.left.add({
-		type = "frame",
-		direction = "vertical",
-		name = EDITOR_PANEL_NAME,
-		caption = { "die-shrink-editor.title" },
-	})
-	local frame = outer.add({
-		type = "frame",
-		direction = "vertical",
-		style = "inside_shallow_frame_with_padding",
-	})
-
-	local exit_flow = frame.add({ type = "flow", direction = "horizontal" })
-	local exit_button = exit_flow.add({
-		type = "button",
-		name = EDITOR_EXIT_BUTTON_NAME,
-		caption = { "die-shrink-editor.exit" },
-		tooltip = { "die-shrink-editor.exit-tooltip" },
-	})
-	exit_button.style.width = 180
-
-	local info = frame.add({
-		type = "label",
-		caption = { "die-shrink-editor.info" },
-	})
-	info.style.single_line = false
-	info.style.maximal_width = 220
-	info.style.top_margin = 8
+---@param entity_name string
+local function set_cursor_ghost(player, entity_name)
+	local cursor_stack = player.cursor_stack
+	if
+		cursor_stack
+		and cursor_stack.valid_for_read
+		and cursor_stack.name ~= entity_name
+	then
+		player.clear_cursor()
+	end
+	player.cursor_ghost = entity_name
 end
 
 ---@param entity_name string
@@ -395,8 +371,7 @@ local function restore_editor_blueprint(surface, force, blueprint)
 end
 
 ---@param player_index uint
----@param reason string
-local function save_editor_session(player_index, reason)
+local function save_editor_session(player_index)
 	local editor_sessions = get_editor_sessions()
 	---@type DieShrink.EditorSession?
 	local session = editor_sessions[player_index]
@@ -405,7 +380,6 @@ local function save_editor_session(player_index, reason)
 
 	local player = game.get_player(player_index)
 	if not player then return end
-	close_editor_panel(player)
 
 	local surface = game.get_surface(session.surface_name)
 	if not surface or not surface.valid then return end
@@ -434,22 +408,16 @@ local function save_editor_session(player_index, reason)
 		tags.blueprint = nil
 		set_error = remote.call("things", "set_tags", session.thing_id, tags)
 	end
-	strace.trace("editor-save", {
-		reason = reason,
-		player_index = player_index,
-		thing_id = session.thing_id,
-		has_blueprint = blueprint ~= nil,
-		error = set_error,
-	})
 end
 
 ---@param player LuaPlayer
 ---@param thing things.ThingSummary
 local function open_editor_for_thing(player, thing)
 	local editor_sessions = get_editor_sessions()
-	if editor_sessions[player.index] then
-		save_editor_session(player.index, "switch-ic")
-	end
+	if editor_sessions[player.index] then close_editor_session(player.index) end
+
+	local ic = get_ic_state(thing.id)
+	if not ic then return end
 
 	local surface = get_or_create_editor_surface(player.index)
 	prepare_surface_for_force(surface, player.force --[[@as LuaForce]])
@@ -468,7 +436,6 @@ local function open_editor_for_thing(player, thing)
 		surface_name = surface.name,
 	}
 
-	open_editor_panel(player)
 	player.set_controller({
 		type = defines.controllers.remote,
 		surface = surface,
@@ -477,6 +444,8 @@ local function open_editor_for_thing(player, thing)
 	if player.zoom < EDITOR_ENTRY_MIN_ZOOM then
 		player.zoom = EDITOR_ENTRY_MIN_ZOOM
 	end
+
+	open_editor_ui(player, ic)
 end
 
 event.bind("die-shrink-click", function(ev)
@@ -494,20 +463,6 @@ event.bind("die-shrink-click", function(ev)
 	open_editor_for_thing(player, thing)
 end)
 
-event.bind(defines.events.on_gui_click, function(ev)
-	local element = ev.element
-	if not element or not element.valid then return end
-	if element.name ~= EDITOR_EXIT_BUTTON_NAME then return end
-
-	local player = game.get_player(ev.player_index)
-	if not player then return end
-
-	save_editor_session(ev.player_index, "exit-button")
-	if player.controller_type == defines.controllers.remote then
-		player.exit_remote_view()
-	end
-end)
-
 event.bind(defines.events.on_player_controller_changed, function(ev)
 	local editor_sessions = storage.editor_sessions
 	if not editor_sessions or not editor_sessions[ev.player_index] then return end
@@ -515,7 +470,7 @@ event.bind(defines.events.on_player_controller_changed, function(ev)
 	local player = game.get_player(ev.player_index)
 	if not player then return end
 	if player.controller_type ~= defines.controllers.remote then
-		save_editor_session(ev.player_index, "controller-left-remote")
+		close_editor_session(ev.player_index)
 	end
 end)
 
@@ -527,13 +482,13 @@ event.bind(defines.events.on_player_changed_surface, function(ev)
 	local player = game.get_player(ev.player_index)
 	if not player then return end
 	if player.surface.name ~= session.surface_name then
-		save_editor_session(ev.player_index, "surface-changed")
+		close_editor_session(ev.player_index)
 	end
 end)
 
 event.bind(
 	defines.events.on_pre_player_left_game,
-	function(ev) save_editor_session(ev.player_index, "left-game") end
+	function(ev) close_editor_session(ev.player_index) end
 )
 
 event.bind(defines.events.on_marked_for_deconstruction, function(ev)
@@ -590,3 +545,25 @@ event.bind(
 	defines.events.script_raised_revive,
 	function(ev) handle_editor_surface_build(ev.entity, nil) end
 )
+
+---@param player_index PlayerIndex
+function _G.close_editor_session(player_index)
+	local editor_sessions = storage.editor_sessions
+	if not editor_sessions or not editor_sessions[player_index] then return end
+	local session = editor_sessions[player_index]
+
+	save_editor_session(player_index)
+
+	local player = game.get_player(player_index)
+	if
+		not player
+		or not player.valid
+		or player.controller_type ~= defines.controllers.remote
+	then
+		return
+	end
+
+	player.exit_remote_view()
+
+	event.raise("dieshrink.editor_session_closed", player_index)
+end

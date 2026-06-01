@@ -1,3 +1,4 @@
+local collision_mask_util = require("collision-mask-util")
 local constants = require("lib.constants")
 
 -- Internal radar to keep editor surfaces charted.
@@ -34,27 +35,6 @@ local radar = {
 }
 data:extend({ radar })
 
--- local radar = data.raw["radar"]["radar"]
--- if radar then
--- 	radar = table.deepcopy(radar)
--- 	radar.name = constants.mod_prefix .. "-editor-radar"
--- 	radar.hidden_in_factoriopedia = true
--- 	radar.pictures = {
--- 		count = 1,
--- 		filename = __GRAPHICS_PATH__ .. "invisible.png",
--- 		width = 1,
--- 		height = 1,
--- 		direction_count = 1,
--- 	}
--- 	radar.flags = {
--- 		"not-on-map",
--- 		"hide-alt-info",
--- 		"not-blueprintable",
--- 		"not-deconstructable",
--- 	}
--- 	data:extend({ radar })
--- end
-
 -- Internal energy source to power combinators on editor surfaces.
 ---@type data.ElectricEnergyInterfacePrototype
 local energy_source = {
@@ -66,9 +46,9 @@ local energy_source = {
 		render_no_power_icon = true,
 		render_no_network_icon = true,
 		usage_priority = "tertiary",
-		output_flow_limit = "2000MW",
+		output_flow_limit = "1YW",
 		input_flow_limit = "0MW",
-		buffer_capacity = "200MW",
+		buffer_capacity = "1RW",
 	},
 	picture = {
 		count = 1,
@@ -77,7 +57,7 @@ local energy_source = {
 		height = 1,
 		direction_count = 1,
 	},
-	energy_production = "2000MW",
+	energy_production = "1RW",
 	gui_mode = "none",
 	flags = {
 		"not-on-map",
@@ -87,3 +67,63 @@ local energy_source = {
 	},
 }
 data:extend({ energy_source })
+
+-- Buildable internal pad to bond to external pins
+---@type data.ContainerPrototype
+local pad = {
+	-- PrototypeBase
+	type = "container",
+	name = constants.pad_name,
+	hidden_in_factoriopedia = true,
+
+	-- ContainerPrototype
+	inventory_size = 0,
+	picture = data.raw["lamp"]["small-lamp"].picture_off,
+	circuit_wire_max_distance = constants.circuit_wire_max_distance,
+	draw_copper_wires = false,
+	draw_circuit_wires = true,
+
+	-- EntityWithHealthPrototype
+	max_health = 1,
+
+	-- EntityPrototype
+	icon = data.raw["lamp"]["small-lamp"].icon,
+	icon_size = data.raw["lamp"]["small-lamp"].icon_size,
+	collision_box = data.raw["lamp"]["small-lamp"].collision_box,
+	collision_mask = data.raw["lamp"]["small-lamp"].collision_mask,
+	selection_box = data.raw["lamp"]["small-lamp"].selection_box,
+	flags = {
+		"not-on-map",
+		"hide-alt-info",
+		"not-upgradable",
+		"no-automated-item-removal",
+		"no-automated-item-insertion",
+		"not-in-kill-statistics",
+		"placeable-player",
+		"player-creation",
+	},
+	minable = { mining_time = 1 },
+	selection_priority = 70,
+	allow_copy_paste = false,
+}
+
+-- Needed for pads to be blueprintable.
+---@type data.ItemPrototype
+local pad_item = {
+	-- PrototypeBase
+	type = "item",
+	name = constants.pad_name,
+	order = "f[iber-optics]",
+	subgroup = "circuit-network",
+	hidden_in_factoriopedia = true,
+
+	-- ItemPrototype
+	stack_size = 50,
+	icon = data.raw["item"]["small-lamp"].icon,
+	icon_size = data.raw["item"]["small-lamp"].icon_size,
+	place_result = constants.pad_name,
+	flags = { "hide-from-bonus-gui", "only-in-cursor" },
+	weight = 0,
+}
+
+data:extend({ pad, pad_item })
