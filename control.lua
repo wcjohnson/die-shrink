@@ -36,6 +36,7 @@ local entities_lib = require("lib.core.entities")
 
 require("control.ic")
 require("control.storage")
+require("control.editor")
 require("control.pins")
 
 -- Enable support for the Global Variable Viewer debugging mod, if it is

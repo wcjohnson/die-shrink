@@ -3,6 +3,7 @@ local oc_lib = require("lib.core.orientation.orientation-class")
 require("data.pin")
 require("data.ic")
 require("data.tech")
+require("data.internal")
 
 data:extend({
 	{ type = "custom-event", name = "die-shrink-on_initialized" },
