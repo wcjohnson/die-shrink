@@ -1,11 +1,21 @@
 local ps_lib = require("control.player-state")
 
+---@alias PlayerIndex uint
+---@alias SurfaceIndex uint
+---@alias ThingID int64
+
+---@class DieShrink.EditorSession
+---@field thing_id ThingID
+---@field surface_name string
+
 ---@class DieShrink.Storage
----@field players {[uint]: DieShrink.PlayerState}
----@field ics {[int]: DieShrink.IC}
+---@field players {[PlayerIndex]: DieShrink.PlayerState}
+---@field ics {[ThingID]: DieShrink.IC}
+---@field editor_sessions {[PlayerIndex]: DieShrink.EditorSession}
+---@field editor_surface_owners {[SurfaceIndex]: PlayerIndex}
 storage = {}
 
----@param player_index uint
+---@param player_index PlayerIndex
 ---@return DieShrink.PlayerState
 function _G.get_or_create_player_state(player_index)
 	if not storage.players then storage.players = {} end
@@ -15,13 +25,13 @@ function _G.get_or_create_player_state(player_index)
 	return storage.players[player_index]
 end
 
----@param player_index uint
+---@param player_index PlayerIndex
 ---@return DieShrink.PlayerState?
 function _G.get_player_state(player_index)
 	return storage.players and storage.players[player_index]
 end
 
----@param thing_id int
+---@param thing_id ThingID
 ---@return DieShrink.IC
 function _G.get_or_create_ic_state(thing_id)
 	if not storage.ics then storage.ics = {} end
@@ -29,6 +39,6 @@ function _G.get_or_create_ic_state(thing_id)
 	return storage.ics[thing_id]
 end
 
----@param thing_id int
+---@param thing_id ThingID
 ---@return DieShrink.IC?
 function _G.get_ic_state(thing_id) return storage.ics and storage.ics[thing_id] end

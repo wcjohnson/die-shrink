@@ -46,33 +46,26 @@ local function shallow_copy_tags(tags)
 	return copy
 end
 
----@class DieShrink.EditorStorage
----@field sessions {[uint]: DieShrink.EditorSession}
----@field surface_owners {[uint]: uint}
+---@return {[uint]: DieShrink.EditorSession}
+local function get_editor_sessions()
+	if not storage.editor_sessions then storage.editor_sessions = {} end
+	return storage.editor_sessions
+end
 
----@class DieShrink.EditorSession
----@field thing_id int64
----@field surface_name string
-
----@return DieShrink.EditorStorage
-local function get_editor_storage()
-	if not storage.editor then
-		storage.editor = {
-			sessions = {},
-			surface_owners = {},
-		}
+---@return {[uint]: uint}
+local function get_editor_surface_owners()
+	if not storage.editor_surface_owners then
+		storage.editor_surface_owners = {}
 	end
-	return storage.editor
+	return storage.editor_surface_owners
 end
 
 ---@param surface LuaSurface?
 ---@return boolean
 local function is_editor_surface(surface)
 	if not surface or not surface.valid then return false end
-	local editor_storage = storage.editor
-	return editor_storage
-			and editor_storage.surface_owners
-			and editor_storage.surface_owners[surface.index] ~= nil
+	local editor_surface_owners = storage.editor_surface_owners
+	return editor_surface_owners and editor_surface_owners[surface.index] ~= nil
 		or false
 end
 
@@ -208,7 +201,7 @@ local function prepare_surface_for_force(surface, force)
 end
 
 ---@param surface LuaSurface
----@param force string|integer|LuaForce
+---@param force string|integer|LuaForce|nil
 ---@param name string
 ---@param position MapPosition
 ---@return LuaEntity?
@@ -248,7 +241,7 @@ local function connect_editor_infra(surface, force)
 	if source_proto then
 		ensure_single_editor_entity(
 			surface,
-			force,
+			nil,
 			EDITOR_ENERGY_SOURCE_NAME,
 			{ EDITOR_SIZE / 2 + 4, 10 }
 		)
@@ -263,7 +256,6 @@ end
 ---@param player_index uint
 ---@return LuaSurface
 local function get_or_create_editor_surface(player_index)
-	local editor_storage = get_editor_storage()
 	local surface_name = EDITOR_SURFACE_PREFIX .. tostring(player_index)
 	local surface = game.get_surface(surface_name)
 	if not surface or not surface.valid then
@@ -272,7 +264,7 @@ local function get_or_create_editor_surface(player_index)
 	if not surface.has_global_electric_network then
 		surface.create_global_electric_network()
 	end
-	editor_storage.surface_owners[surface.index] = player_index
+	get_editor_surface_owners()[surface.index] = player_index
 	return surface
 end
 
@@ -405,11 +397,11 @@ end
 ---@param player_index uint
 ---@param reason string
 local function save_editor_session(player_index, reason)
-	local editor_storage = get_editor_storage()
+	local editor_sessions = get_editor_sessions()
 	---@type DieShrink.EditorSession?
-	local session = editor_storage.sessions[player_index]
+	local session = editor_sessions[player_index]
 	if not session then return end
-	editor_storage.sessions[player_index] = nil
+	editor_sessions[player_index] = nil
 
 	local player = game.get_player(player_index)
 	if not player then return end
@@ -454,8 +446,8 @@ end
 ---@param player LuaPlayer
 ---@param thing things.ThingSummary
 local function open_editor_for_thing(player, thing)
-	local editor_storage = get_editor_storage()
-	if editor_storage.sessions[player.index] then
+	local editor_sessions = get_editor_sessions()
+	if editor_sessions[player.index] then
 		save_editor_session(player.index, "switch-ic")
 	end
 
@@ -471,7 +463,7 @@ local function open_editor_for_thing(player, thing)
 		restore_editor_blueprint(surface, player_force, blueprint_content)
 	end
 
-	editor_storage.sessions[player.index] = {
+	editor_sessions[player.index] = {
 		thing_id = thing.id,
 		surface_name = surface.name,
 	}
@@ -517,10 +509,8 @@ event.bind(defines.events.on_gui_click, function(ev)
 end)
 
 event.bind(defines.events.on_player_controller_changed, function(ev)
-	local editor_storage = storage.editor
-	if not editor_storage or not editor_storage.sessions[ev.player_index] then
-		return
-	end
+	local editor_sessions = storage.editor_sessions
+	if not editor_sessions or not editor_sessions[ev.player_index] then return end
 
 	local player = game.get_player(ev.player_index)
 	if not player then return end
@@ -530,8 +520,8 @@ event.bind(defines.events.on_player_controller_changed, function(ev)
 end)
 
 event.bind(defines.events.on_player_changed_surface, function(ev)
-	local editor_storage = storage.editor
-	local session = editor_storage and editor_storage.sessions[ev.player_index]
+	local editor_sessions = storage.editor_sessions
+	local session = editor_sessions and editor_sessions[ev.player_index]
 	if not session then return end
 
 	local player = game.get_player(ev.player_index)
