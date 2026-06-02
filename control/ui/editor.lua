@@ -23,27 +23,33 @@ lib.EditorUi = relm.define("EditorUi", function(props)
 	if (not player) or not player.valid then return end
 
 	-- Window management
-	local function close_me()
-		relm.root_destroy(root_id)
-		close_editor_session(player_index)
-	end
-	local handle_close = ultros.use_memoized_window_position(close_me, function()
-		local st = get_player_state(player_index)
-		return st and st.editor_window_position or { 0, 0 }
-	end, function(xy)
-		local st = get_or_create_player_state(player_index)
-		st.editor_window_position = xy
-	end, function(elt) elt.location = { 0, 0 } end)
+	local function close_me() relm.root_destroy(root_id) end
+	local close_and_save_pos = ultros.use_memoized_window_position(
+		close_me,
+		function()
+			local st = get_player_state(player_index)
+			return st and st.editor_window_position or { 0, 0 }
+		end,
+		function(xy)
+			local st = get_or_create_player_state(player_index)
+			st.editor_window_position = xy
+		end,
+		function(elt) elt.location = { 0, 0 } end
+	)
 	relm_util.use_event_handler(
 		"dieshrink.editor_session_closed",
 		function(_, _, _player_index)
-			if _player_index == player_index then relm.root_destroy(root_id) end
+			if _player_index == player_index then close_and_save_pos() end
 		end
 	)
+	local function close_with_editor()
+		close_and_save_pos()
+		close_editor_session(player_index)
+	end
 
 	return ultros.WindowFrame({
 		caption = { "die-shrink-editor.title" },
-		on_close = handle_close,
+		on_close = close_with_editor,
 	}, {
 		HF({ width = 300 }, {
 			ultros.SpriteButton({

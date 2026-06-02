@@ -559,3 +559,8 @@ function _G.open_editor_session(player_index, ic)
 	if not player or not player.valid then return end
 	open_editor_for_ic(player, ic)
 end
+
+function _G.get_editor_session(player_index)
+	local editor_sessions = get_editor_sessions()
+	return editor_sessions and editor_sessions[player_index] or nil
+end
