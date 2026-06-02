@@ -1,8 +1,9 @@
 local event = require("lib.core.event")
 local constants = require("lib.constants")
 local strace = require("lib.core.strace")
+local counters = require("lib.core.counters")
 
-local EDITOR_SURFACE_PREFIX = "die-shrink-editor-p-"
+local EDITOR_SURFACE_PREFIX = "die-shrink-editor-s-"
 local EDITOR_PANEL_NAME = "die-shrink-editor-panel"
 local EDITOR_EXIT_BUTTON_NAME = "die-shrink-editor-exit"
 local EDITOR_ADD_PAD_BUTTON_NAME = "die-shrink-editor-add-pad"
@@ -69,20 +70,6 @@ local function is_editor_surface(surface)
 	local editor_surface_owners = storage.editor_surface_owners
 	return editor_surface_owners and editor_surface_owners[surface.index] ~= nil
 		or false
-end
-
----@param player LuaPlayer
----@param entity_name string
-local function set_cursor_ghost(player, entity_name)
-	local cursor_stack = player.cursor_stack
-	if
-		cursor_stack
-		and cursor_stack.valid_for_read
-		and cursor_stack.name ~= entity_name
-	then
-		player.clear_cursor()
-	end
-	player.cursor_ghost = entity_name
 end
 
 ---@param entity_name string
@@ -232,16 +219,59 @@ end
 ---@param player_index uint
 ---@return LuaSurface
 local function get_or_create_editor_surface(player_index)
-	local surface_name = EDITOR_SURFACE_PREFIX .. tostring(player_index)
+	local editor_surface_owners = get_editor_surface_owners()
+
+	---@param surface LuaSurface
+	---@return LuaSurface
+	local function claim_surface(surface)
+		editor_surface_owners[surface.index] = player_index
+		return surface
+	end
+
+	local hot_surface = storage.editor_hot_surface
+	if not hot_surface or not hot_surface.valid then
+		hot_surface = game.get_surface(EDITOR_SURFACE_PREFIX .. "hot")
+	end
+	if not hot_surface or not hot_surface.valid then
+		hot_surface = create_editor_surface(EDITOR_SURFACE_PREFIX .. "hot")
+	end
+	storage.editor_hot_surface = hot_surface
+	if editor_surface_owners[hot_surface.index] == nil then
+		return claim_surface(hot_surface)
+	end
+
+	while true do
+		local next_id = counters.next("die_shrink_editor_surface")
+		local surface_name = EDITOR_SURFACE_PREFIX .. tostring(next_id)
+
+		local existing = game.get_surface(surface_name)
+		if not existing then
+			local new_surface = create_editor_surface(surface_name)
+			return claim_surface(new_surface)
+		end
+	end
+end
+
+---@param surface_name string
+---@param player_index uint
+local function release_editor_surface(surface_name, player_index)
 	local surface = game.get_surface(surface_name)
-	if not surface or not surface.valid then
-		surface = create_editor_surface(surface_name)
+	if not surface or not surface.valid then return end
+
+	local editor_surface_owners = get_editor_surface_owners()
+	if editor_surface_owners[surface.index] == player_index then
+		editor_surface_owners[surface.index] = nil
 	end
-	if not surface.has_global_electric_network then
-		surface.create_global_electric_network()
+
+	local hot_surface = storage.editor_hot_surface
+	if not hot_surface or not hot_surface.valid then
+		storage.editor_hot_surface = nil
+		hot_surface = nil
 	end
-	get_editor_surface_owners()[surface.index] = player_index
-	return surface
+
+	if not hot_surface or surface.index ~= hot_surface.index then
+		game.delete_surface(surface)
+	end
 end
 
 ---@param surface LuaSurface
@@ -538,6 +568,7 @@ function _G.close_editor_session(player_index)
 	local session = editor_sessions[player_index]
 
 	save_editor_session(player_index)
+	release_editor_surface(session.surface_name, player_index)
 	event.raise("dieshrink.editor_session_closed", player_index)
 
 	local player = game.get_player(player_index)
