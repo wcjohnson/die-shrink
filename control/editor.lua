@@ -1,12 +1,17 @@
+--------------------------------------------------------------------------------
+-- Circuit editor
+--------------------------------------------------------------------------------
+
+local class = require("lib.core.class").class
 local event = require("lib.core.event")
 local constants = require("lib.constants")
 local strace = require("lib.core.strace")
 local counters = require("lib.core.counters")
+local tlib = require("lib.core.table")
+
+local EMPTY = tlib.EMPTY
 
 local EDITOR_SURFACE_PREFIX = "die-shrink-editor-s-"
-local EDITOR_PANEL_NAME = "die-shrink-editor-panel"
-local EDITOR_EXIT_BUTTON_NAME = "die-shrink-editor-exit"
-local EDITOR_ADD_PAD_BUTTON_NAME = "die-shrink-editor-add-pad"
 local EDITOR_SIZE = 64
 local EDITOR_ENTRY_MIN_ZOOM = 0.75
 local EDITOR_ENERGY_SOURCE_NAME = constants.mod_prefix
@@ -37,6 +42,14 @@ local EDITOR_SYSTEM_ENTITY_NAMES = {
 	[EDITOR_RADAR_NAME] = true,
 }
 
+local EDITOR_TAGGED_ENTITY_NAMES = {
+	[constants.pad_name] = true,
+}
+
+--------------------------------------------------------------------------------
+-- Editor impl
+--------------------------------------------------------------------------------
+
 ---@param tags Tags?
 ---@return Tags
 local function shallow_copy_tags(tags)
@@ -47,6 +60,65 @@ local function shallow_copy_tags(tags)
 		end
 	end
 	return copy
+end
+
+---@param surface LuaSurface?
+---@return DieShrink.EditorSession?
+local function get_editor_session_by_surface(surface)
+	if not surface or not surface.valid then
+		strace.warn("get_editor_session_by_surface: invalid surface", surface)
+		return nil
+	end
+	local owner_index = storage.editor_surface_owners
+		and storage.editor_surface_owners[surface.index]
+	return owner_index
+		and storage.editor_sessions
+		and storage.editor_sessions[owner_index]
+end
+
+---@param tags Tags?
+---@return DieShrink.EditorPadInfo?
+local function get_pad_info_from_tags(tags)
+	if not tags then return nil end
+	if
+		tags.pin == nil
+		and tags.label == nil
+		and tags.i == nil
+		and tags.o == nil
+	then
+		return nil
+	end
+	return {
+		pin = tags.pin,
+		label = tags.label,
+		i = tags.i,
+		o = tags.o,
+	}
+end
+
+---@param session DieShrink.EditorSession?
+---@param pad LuaEntity?
+---@param tags Tags?
+local function apply_pad_tags(session, pad, tags)
+	if
+		not session
+		or not pad
+		or not pad.valid
+		or pad.name ~= constants.pad_name
+	then
+		return
+	end
+	local initial_info = get_pad_info_from_tags(tags)
+	strace.trace(
+		"apply_pad_tags",
+		session,
+		pad,
+		pad.unit_number,
+		tags,
+		initial_info
+	)
+	if not initial_info then return end
+	session:set_pad_info(pad.unit_number, initial_info)
 end
 
 ---@return {[uint]: DieShrink.EditorSession}
@@ -93,9 +165,22 @@ end
 ---@param player LuaPlayer?
 local function handle_built_ghost(entity, player)
 	if not entity.valid or entity.name ~= "entity-ghost" then return end
+	local ghost_unit_number = entity.unit_number
 	local ghost_name = entity.ghost_name
+	strace.trace(
+		"handle_built_ghost: ghost is",
+		entity,
+		ghost_name,
+		ghost_unit_number
+	)
 	if ghost_name and ALLOWED_ENTITY_NAMES[ghost_name] then
-		entity.silent_revive({ raise_revive = true })
+		local ghost_tags = entity.tags
+		local _, revived = entity.silent_revive({ raise_revive = true })
+		strace.trace("revived ghost into", revived, "with tags", ghost_tags)
+		if revived and ghost_name == constants.pad_name then
+			local session = get_editor_session_by_surface(revived.surface)
+			apply_pad_tags(session, revived, ghost_tags)
+		end
 		return
 	end
 	notify_not_allowed(ghost_name or "unknown", player, entity.position)
@@ -252,10 +337,9 @@ local function get_or_create_editor_surface(player_index)
 	end
 end
 
----@param surface_name string
+---@param surface LuaSurface
 ---@param player_index uint
-local function release_editor_surface(surface_name, player_index)
-	local surface = game.get_surface(surface_name)
+local function release_editor_surface(surface, player_index)
 	if not surface or not surface.valid then return end
 
 	local editor_surface_owners = get_editor_surface_owners()
@@ -288,24 +372,43 @@ local function clear_editor_surface(surface)
 	end
 end
 
+---@param session DieShrink.EditorSession
 ---@param surface LuaSurface
 ---@param force any
 ---@return string?
-local function capture_editor_blueprint(surface, force)
+local function capture_editor_blueprint(session, surface, force)
+	strace.trace("--- CAPTURE_EDITOR_BLUEPRINT")
 	local inv = game.create_inventory(1)
 	local bp = inv[1]
 	bp.set_stack({ name = "blueprint", count = 1 })
-	bp.create_blueprint({
+	local entities = bp.create_blueprint({
 		surface = surface,
 		force = force,
 		area = EDITOR_BLUEPRINT_AREA,
 	})
+
+	if entities then
+		for index, entity in ipairs(entities) do
+			if entity and entity.valid and entity.name == constants.pad_name then
+				local pad_info = session.pads[entity.unit_number]
+				if pad_info then
+					bp.set_blueprint_entity_tags(index, {
+						pin = pad_info.pin,
+						label = pad_info.label,
+						i = pad_info.i,
+						o = pad_info.o,
+					})
+				end
+			end
+		end
+	end
 
 	local content = nil
 	if bp.is_blueprint_setup and bp.get_blueprint_entity_count() > 0 then
 		content = bp.export_stack()
 	end
 	inv.destroy()
+	strace.trace("--- CAPTURE_EDITOR_BLUEPRINT DONE")
 	return content
 end
 
@@ -374,6 +477,7 @@ end
 ---@param force any
 ---@param blueprint string
 local function restore_editor_blueprint(surface, force, blueprint)
+	strace.trace("--- RESTORE_EDITOR_BLUEPRINT")
 	local inv = game.create_inventory(1)
 	local bp = inv[1]
 	bp.set_stack({ name = "blueprint", count = 1 })
@@ -398,6 +502,7 @@ local function restore_editor_blueprint(surface, force, blueprint)
 		end
 	end
 	inv.destroy()
+	strace.trace("--- RESTORE_EDITOR_BLUEPRINT DONE")
 end
 
 ---@param player_index uint
@@ -406,37 +511,38 @@ local function save_editor_session(player_index)
 	---@type DieShrink.EditorSession?
 	local session = editor_sessions[player_index]
 	if not session then return end
-	editor_sessions[player_index] = nil
+	session:destroy()
 
 	local player = game.get_player(player_index)
 	if not player then return end
 
-	local surface = game.get_surface(session.surface_name)
+	local surface = session.surface
 	if not surface or not surface.valid then return end
 
-	local get_error, thing_raw = remote.call("things", "get", session.thing_id)
-	if get_error or not thing_raw then return end
-	---@type things.ThingSummary
-	local thing = thing_raw
+	local ic = session.ic
+	if not ic then return end
+
+	local get_error, thing = remote.call("things", "get", ic.thing_id)
+	if not thing then return end
 
 	local force = player.force --[[@as LuaForce]]
 
 	---@type string?
-	local blueprint = capture_editor_blueprint(surface, force)
+	local blueprint = capture_editor_blueprint(session, surface, force)
 	local set_error
 	if blueprint then
 		local blueprint_content = blueprint --[[@as string]]
 		set_error = remote.call(
 			"things",
 			"set_tag",
-			session.thing_id,
+			ic.thing_id,
 			"blueprint",
 			blueprint_content
 		)
 	else
 		local tags = shallow_copy_tags(thing.tags)
 		tags.blueprint = nil
-		set_error = remote.call("things", "set_tags", session.thing_id, tags)
+		set_error = remote.call("things", "set_tags", ic.thing_id, tags)
 	end
 end
 
@@ -454,17 +560,15 @@ local function open_editor_for_ic(player, ic)
 	clear_editor_surface(surface)
 	connect_editor_infra(surface, player.force --[[@as LuaForce]])
 
+	-- Session must init before we start building on the surface.
+	local session = EditorSession:new(player.index, ic, surface)
+
 	local blueprint = thing.tags and thing.tags.blueprint
 	if type(blueprint) == "string" and blueprint ~= "" then
 		local blueprint_content = blueprint --[[@as string]]
 		local player_force = player.force --[[@as LuaForce]]
 		restore_editor_blueprint(surface, player_force, blueprint_content)
 	end
-
-	editor_sessions[player.index] = {
-		thing_id = thing.id,
-		surface_name = surface.name,
-	}
 
 	player.set_controller({
 		type = defines.controllers.remote,
@@ -475,7 +579,7 @@ local function open_editor_for_ic(player, ic)
 		player.zoom = EDITOR_ENTRY_MIN_ZOOM
 	end
 
-	event.raise("dieshrink.editor_session_opened", player, ic)
+	event.raise("dieshrink.editor_session_opened", session)
 end
 
 event.bind(defines.events.on_player_controller_changed, function(ev)
@@ -496,7 +600,7 @@ event.bind(defines.events.on_player_changed_surface, function(ev)
 
 	local player = game.get_player(ev.player_index)
 	if not player then return end
-	if player.surface.name ~= session.surface_name then
+	if player.surface ~= session.surface then
 		close_editor_session(ev.player_index)
 	end
 end)
@@ -526,8 +630,9 @@ event.bind(defines.events.on_marked_for_deconstruction, function(ev)
 end)
 
 ---@param entity LuaEntity
+---@param tags Tags?
 ---@param player_index uint?
-local function handle_editor_surface_build(entity, player_index)
+local function handle_editor_surface_build(entity, tags, player_index)
 	if
 		not entity
 		or not entity.valid
@@ -535,6 +640,15 @@ local function handle_editor_surface_build(entity, player_index)
 	then
 		return
 	end
+
+	strace.trace("editor_surface_build", player_index, entity, tags)
+	if tags and EDITOR_TAGGED_ENTITY_NAMES[entity.name] then
+		local session = get_editor_session_by_surface(entity.surface)
+		if entity.name == constants.pad_name then
+			apply_pad_tags(session, entity, tags)
+		end
+	end
+
 	if entity.name ~= "entity-ghost" then return end
 
 	local player = player_index and game.get_player(player_index) or nil
@@ -543,23 +657,121 @@ end
 
 event.bind(
 	defines.events.on_built_entity,
-	function(ev) handle_editor_surface_build(ev.entity, ev.player_index) end
-)
-
-event.bind(
-	defines.events.on_robot_built_entity,
-	function(ev) handle_editor_surface_build(ev.entity, nil) end
+	function(ev) handle_editor_surface_build(ev.entity, ev.tags, ev.player_index) end
 )
 
 event.bind(
 	defines.events.script_raised_built,
-	function(ev) handle_editor_surface_build(ev.entity, nil) end
+	function(ev) handle_editor_surface_build(ev.entity, ev.tags, nil) end
 )
 
 event.bind(
 	defines.events.script_raised_revive,
-	function(ev) handle_editor_surface_build(ev.entity, nil) end
+	function(ev) handle_editor_surface_build(ev.entity, ev.tags, nil) end
 )
+
+--------------------------------------------------------------------------------
+-- Editor session
+--------------------------------------------------------------------------------
+
+---@class DieShrink.EditorPadInfo
+---@field unit_number UnitNumber
+---@field pin? integer
+---@field label? string
+---@field i? boolean
+---@field o? boolean
+
+---@class DieShrink.EditorSession
+---@field player_index PlayerIndex The player owning this editor session.
+---@field ic DieShrink.IC The IC being edited in this session.
+---@field surface LuaSurface The editor surface for this session.
+---@field pads {[UnitNumber]: DieShrink.EditorPadInfo} The pads currently in this editor session.
+local EditorSession = class("DieShrink.EditorSession")
+_G.EditorSession = EditorSession
+
+---@param player_index PlayerIndex
+---@param ic DieShrink.IC
+---@param surface LuaSurface
+function EditorSession:new(player_index, ic, surface)
+	---@type DieShrink.EditorSession
+	local session = setmetatable({
+		player_index = player_index,
+		ic = ic,
+		surface = surface,
+		pads = {},
+	}, self)
+	storage.editor_sessions = storage.editor_sessions or {}
+	storage.editor_sessions[player_index] = session
+	return session
+end
+
+---@param unit_number UnitNumber
+---@param initial_info? fun(): DieShrink.EditorPadInfo
+function EditorSession:get_or_create_pad_info(unit_number, initial_info)
+	local pad_info = self.pads[unit_number]
+	if not pad_info then
+		pad_info = initial_info and initial_info() or {}
+		pad_info.unit_number = unit_number
+		self.pads[unit_number] = pad_info
+	end
+	return pad_info
+end
+
+---@param unit_number UnitNumber
+---@param info DieShrink.EditorPadInfo
+function EditorSession:set_pad_info(unit_number, info)
+	self.pads[unit_number] = info
+	event.raise("dieshrink.editor_session_pad_changed", self, unit_number)
+end
+
+function EditorSession:get_pad_info(unit_number)
+	return self.pads[unit_number] or EMPTY
+end
+
+function EditorSession:set_pad_pin(unit_number, pin)
+	self:get_or_create_pad_info(unit_number).pin = pin
+	event.raise("dieshrink.editor_session_pad_changed", self, unit_number)
+end
+
+function EditorSession:get_pad_pin(unit_number)
+	return self:get_pad_info(unit_number).pin
+end
+
+function EditorSession:set_pad_label(unit_number, label)
+	self:get_or_create_pad_info(unit_number).label = label
+	event.raise("dieshrink.editor_session_pad_changed", self, unit_number)
+end
+
+function EditorSession:set_pad_i(unit_number, is_in)
+	self:get_or_create_pad_info(unit_number).i = is_in
+	event.raise("dieshrink.editor_session_pad_changed", self, unit_number)
+end
+
+function EditorSession:set_pad_o(unit_number, is_out)
+	self:get_or_create_pad_info(unit_number).o = is_out
+	event.raise("dieshrink.editor_session_pad_changed", self, unit_number)
+end
+
+function EditorSession:destroy()
+	if storage.editor_sessions then
+		storage.editor_sessions[self.player_index] = nil
+	end
+end
+
+---@param player_index PlayerIndex
+---@param ic DieShrink.IC
+function _G.open_editor_session(player_index, ic)
+	local player = game.get_player(player_index)
+	if not player or not player.valid then return end
+	open_editor_for_ic(player, ic)
+end
+
+---@param player_index PlayerIndex
+---@return DieShrink.EditorSession?
+function _G.get_editor_session(player_index)
+	local editor_sessions = get_editor_sessions()
+	return editor_sessions and editor_sessions[player_index] or nil
+end
 
 ---@param player_index PlayerIndex
 function _G.close_editor_session(player_index)
@@ -568,7 +780,7 @@ function _G.close_editor_session(player_index)
 	local session = editor_sessions[player_index]
 
 	save_editor_session(player_index)
-	release_editor_surface(session.surface_name, player_index)
+	release_editor_surface(session.surface, player_index)
 	event.raise("dieshrink.editor_session_closed", player_index)
 
 	local player = game.get_player(player_index)
@@ -581,17 +793,4 @@ function _G.close_editor_session(player_index)
 	end
 
 	player.exit_remote_view()
-end
-
----@param player_index PlayerIndex
----@param ic DieShrink.IC
-function _G.open_editor_session(player_index, ic)
-	local player = game.get_player(player_index)
-	if not player or not player.valid then return end
-	open_editor_for_ic(player, ic)
-end
-
-function _G.get_editor_session(player_index)
-	local editor_sessions = get_editor_sessions()
-	return editor_sessions and editor_sessions[player_index] or nil
 end

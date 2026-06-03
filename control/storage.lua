@@ -3,10 +3,7 @@ local ps_lib = require("control.player-state")
 ---@alias PlayerIndex uint
 ---@alias SurfaceIndex uint
 ---@alias ThingID int64
-
----@class DieShrink.EditorSession
----@field thing_id ThingID The IC being edited in this session.
----@field surface_name string The name of the editor surface for this session.
+---@alias UnitNumber int64
 
 ---@class DieShrink.Storage
 ---@field players {[PlayerIndex]: DieShrink.PlayerState}

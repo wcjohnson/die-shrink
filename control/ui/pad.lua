@@ -17,8 +17,15 @@ lib.PadUi = relm.define("PadUi", function(props)
 	local root_id = props.root_id
 	local player_index = props.player_index
 	local player = game.get_player(player_index)
-
 	if (not player) or not player.valid then return end
+	local session = props.session --[[@as DieShrink.EditorSession]]
+	local ic = props.ic --[[@as DieShrink.IC]]
+	local pad_unit_number = props.pad_unit_number
+	local current_pin = session:get_pad_pin(pad_unit_number)
+	local pin_opts = {}
+	for i = 1, ic:get_n_pins() do
+		pin_opts[i] = { key = i, caption = tostring(i) }
+	end
 
 	-- Window management
 	local function close_me() relm.root_destroy(root_id) end
@@ -33,11 +40,27 @@ lib.PadUi = relm.define("PadUi", function(props)
 		end
 	)
 
+	-- Repaint
+	relm_util.use_event_handler(
+		"dieshrink.editor_session_pad_changed",
+		function(_me, _, _session, _unit_number)
+			if _session == session and _unit_number == pad_unit_number then
+				relm.paint(_me)
+			end
+		end
+	)
+
 	return ultros.WindowFrame({
 		caption = "Pad",
 		on_close = close_me,
 	}, {
-		HF({ width = 300 }, {}),
+		HF({ width = 300 }, {
+			ultros.Dropdown({
+				options = pin_opts,
+				value = current_pin,
+				on_change = function(_, pin) session:set_pad_pin(pad_unit_number, pin) end,
+			}),
+		}),
 	})
 end)
 
@@ -70,12 +93,7 @@ event.bind(defines.events.on_gui_opened, function(ev)
 	-- Close any existing ui
 	player.opened = nil
 
-	open_pad_ui(
-		player,
-		get_ic_state(session.thing_id),
-		session,
-		selected.unit_number
-	)
+	open_pad_ui(player, session.ic, session, selected.unit_number)
 end)
 
 return lib

@@ -18,7 +18,8 @@ lib.EditorUi = relm.define("EditorUi", function(props)
 	local root_id = props.root_id
 	local player_index = props.player_index
 	local player = game.get_player(player_index)
-	local ic = props.ic --[[@as DieShrink.IC]]
+	local session = props.session --[[@as DieShrink.EditorSession]]
+	local ic = session.ic --[[@as DieShrink.IC]]
 
 	if (not player) or not player.valid then return end
 
@@ -63,22 +64,23 @@ lib.EditorUi = relm.define("EditorUi", function(props)
 	})
 end)
 
----@param player LuaPlayer
----@param ic DieShrink.IC
-function _G.open_editor_ui(player, ic)
+---@param session DieShrink.EditorSession
+function _G.open_editor_ui(session)
+	local player = game.get_player(session.player_index)
+	if not player then return end
 	-- Already open
 	if player.gui.screen["DieShrinkEditorUi"] then return end
 	relm.root_create(
 		player.gui.screen,
 		"DieShrinkEditorUi",
 		"EditorUi",
-		{ ic = ic }
+		{ session = session }
 	)
 end
 
 event.bind(
 	"dieshrink.editor_session_opened",
-	function(player, ic) open_editor_ui(player, ic) end
+	function(session) open_editor_ui(session) end
 )
 
 return lib

@@ -22,6 +22,8 @@ function IC:new(thing_id)
 	return obj
 end
 
+function IC:get_n_pins() return 16 end
+
 function IC:destroy() storage.ics[self.thing_id] = nil end
 
 event.bind(
