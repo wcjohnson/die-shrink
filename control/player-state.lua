@@ -2,6 +2,7 @@ local class = require("lib.core.class").class
 local ovl_lib = require("lib.core.overlay")
 local pos_lib = require("lib.core.math.pos")
 local strace = require("lib.core.strace")
+local event = require("lib.core.event")
 
 local pos_new = pos_lib.pos_new
 local pos_add = pos_lib.pos_add
@@ -13,6 +14,7 @@ local lib = {}
 
 ---@class DieShrink.PlayerState
 ---@field player_index uint Index of the player this state belongs to
+---@field editor_session_stack ID[] Stack of editor session IDs for this player.
 ---@field pin_labels? LuaRenderObject[] Pin label rendering objects
 ---@field editor_window_position? GuiLocation Position of the editor window
 ---@field ic_window_position? GuiLocation Position of the IC window
@@ -24,7 +26,34 @@ function PlayerState:new(player_index)
 	local instance = {}
 	setmetatable(instance, self)
 	instance.player_index = player_index
+	instance.editor_session_stack = {}
 	return instance
+end
+
+---@param id ID
+function PlayerState:push_editor_session(id)
+	self.editor_session_stack[#self.editor_session_stack + 1] = id
+	event.raise("dieshrink.player_editor_session_pushed", self, id)
+end
+
+---@return ID?
+function PlayerState:pop_editor_session()
+	if #self.editor_session_stack == 0 then return nil end
+	local id = table.remove(self.editor_session_stack)
+	event.raise("dieshrink.player_editor_session_popped", self, id)
+	return id
+end
+
+---@return ID?
+function PlayerState:get_current_editor_session_id()
+	return self.editor_session_stack[#self.editor_session_stack]
+end
+
+---@return DieShrink.EditorSession?
+function PlayerState:get_current_editor_session()
+	local id = self:get_current_editor_session_id()
+	if not id then return nil end
+	return storage.editor_sessions and storage.editor_sessions[id]
 end
 
 function PlayerState:clear_pin_labels()

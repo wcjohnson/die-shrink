@@ -18,10 +18,11 @@ lib.EditorUi = relm.define("EditorUi", function(props)
 	local root_id = props.root_id
 	local player_index = props.player_index
 	local player = game.get_player(player_index)
+	if (not player) or not player.valid then return end
+	local player_state = get_player_state(player_index)
+	if not player_state then return end
 	local session = props.session --[[@as DieShrink.EditorSession]]
 	local ic = session.ic --[[@as DieShrink.IC]]
-
-	if (not player) or not player.valid then return end
 
 	-- Window management
 	local function close_me() relm.root_destroy(root_id) end
@@ -38,19 +39,30 @@ lib.EditorUi = relm.define("EditorUi", function(props)
 		function(elt) elt.location = { 0, 0 } end
 	)
 	relm_util.use_event_handler(
-		"dieshrink.editor_session_closed",
-		function(_, _, _player_index)
-			if _player_index == player_index then close_and_save_pos() end
+		"dieshrink.player_editor_session_popped",
+		function(_me, _, ps)
+			if
+				ps
+				and ps.player_index == player_index
+				and not ps:get_current_editor_session_id()
+			then
+				close_and_save_pos()
+			else
+				relm.paint(_me)
+			end
 		end
 	)
-	local function close_with_editor()
-		close_and_save_pos()
-		close_editor_session(player_index)
-	end
+	relm_util.use_event_handler(
+		"dieshrink.player_editor_session_pushed",
+		function(_me, _, ps)
+			if ps and ps.player_index == player_index then relm.paint(_me) end
+		end
+	)
+	local function pop_one_editor() close_current_editor_session(player_index) end
 
 	return ultros.WindowFrame({
 		caption = { "die-shrink-editor.title" },
-		on_close = close_with_editor,
+		closable = false,
 	}, {
 		HF({ width = 300 }, {
 			ultros.SpriteButton({
@@ -61,12 +73,21 @@ lib.EditorUi = relm.define("EditorUi", function(props)
 				end,
 			}),
 		}),
+		ultros.Label({
+			"",
+			"Editor stack:",
+			serpent.line(player_state.editor_session_stack),
+		}),
+		ultros.Button({
+			caption = "Exit",
+			on_click = pop_one_editor,
+		}),
 	})
 end)
 
 ---@param session DieShrink.EditorSession
 function _G.open_editor_ui(session)
-	local player = game.get_player(session.player_index)
+	local player = game.get_player(session.player.index)
 	if not player then return end
 	-- Already open
 	if player.gui.screen["DieShrinkEditorUi"] then return end

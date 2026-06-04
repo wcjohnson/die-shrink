@@ -37,8 +37,10 @@ lib.IcUi = relm.define("IcUi", function(props)
 
 	relm_util.use_event_handler(
 		"dieshrink.editor_session_opened",
-		function(_, _, _player)
-			if _player.index == player_index then close_me() end
+		function(_, _, _session)
+			if _session and _session.player.index == player_index then
+				close_me()
+			end
 		end
 	)
 

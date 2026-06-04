@@ -33,12 +33,12 @@ lib.PadUi = relm.define("PadUi", function(props)
 	ultros.use_auto_center_on_open()
 	ultros.use_close_on_gui_closed(player_index, close_me, false)
 	ultros.use_player_opened(player_index)
-	relm_util.use_event_handler(
-		"dieshrink.editor_session_closed",
-		function(_, _, _player_index)
-			if _player_index == player_index then close_me() end
-		end
-	)
+	relm_util.use_event_handler({
+		"dieshrink.player_editor_session_pushed",
+		"dieshrink.player_editor_session_popped",
+	}, function(_, _, ps)
+		if ps and ps.player_index == player_index then close_me() end
+	end)
 
 	-- Repaint
 	relm_util.use_event_handler(
@@ -83,11 +83,11 @@ event.bind(defines.events.on_gui_opened, function(ev)
 	local player = game.get_player(ev.player_index)
 	if not player then return end
 
-	local selected = ev.entity
+	local selected = ev.entity --[[@as LuaEntity?]]
 	if not selected then return end
 	if selected.name ~= constants.pad_name then return end
 
-	local session = get_editor_session(ev.player_index)
+	local session = get_editor_session_for_surface(selected.surface_index)
 	if not session then return end
 
 	-- Close any existing ui

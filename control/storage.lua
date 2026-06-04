@@ -4,12 +4,13 @@ local ps_lib = require("control.player-state")
 ---@alias SurfaceIndex uint
 ---@alias ThingID int64
 ---@alias UnitNumber int64
+---@alias ID int64
 
 ---@class DieShrink.Storage
 ---@field players {[PlayerIndex]: DieShrink.PlayerState}
 ---@field ics {[ThingID]: DieShrink.IC}
----@field editor_sessions {[PlayerIndex]: DieShrink.EditorSession}
----@field editor_surface_owners {[SurfaceIndex]: PlayerIndex}
+---@field editor_sessions {[ID]: DieShrink.EditorSession}
+---@field surface_to_session {[SurfaceIndex]: ID}
 ---@field editor_hot_surface LuaSurface?
 storage = {}
 
