@@ -8,6 +8,7 @@ local constants = require("lib.constants")
 local strace = require("lib.core.strace")
 local counters = require("lib.core.counters")
 local tlib = require("lib.core.table")
+local scheduler = require("lib.core.scheduler")
 
 local EMPTY = tlib.EMPTY
 
@@ -188,9 +189,12 @@ local function handle_built_ghost(entity, player)
 	entity.destroy()
 end
 
----@param surface_name string
+---@param session DieShrink.EditorSession
 ---@return LuaSurface
-local function create_editor_surface(surface_name)
+local function create_editor_surface(session)
+	local next_id = counters.next("die_shrink_editor_surface")
+	local surface_name = EDITOR_SURFACE_PREFIX .. tostring(next_id)
+	local surface_to_session = get_surface_to_session()
 	local surface = game.create_surface(surface_name, {
 		width = EDITOR_SIZE,
 		height = EDITOR_SIZE,
@@ -203,22 +207,21 @@ local function create_editor_surface(surface_name)
 			decorative = { treat_missing_as_default = false, frequency = "none" },
 		},
 	})
-
+	surface_to_session[surface.index] = session.id
+	session.surface = surface
+	for _, force in pairs(game.forces) do
+		-- force.set_surface_hidden(surface, true)
+	end
 	surface.always_day = true
 	surface.daytime = 0.5
 	surface.freeze_daytime = true
 	surface.show_clouds = false
 	surface.request_to_generate_chunks({ 0, 0 }, 4)
 	surface.force_generate_chunk_requests()
+	surface.create_global_electric_network()
+
+	-- Deco and tiles
 	surface.destroy_decoratives({})
-
-	for _, force in pairs(game.forces) do
-		force.set_surface_hidden(surface, true)
-	end
-	if not surface.has_global_electric_network then
-		surface.create_global_electric_network()
-	end
-
 	local tile_name = prototypes.tile["refined-concrete"] and "refined-concrete"
 		or "concrete"
 	local tiles = {}
@@ -239,103 +242,34 @@ local function create_editor_surface(surface_name)
 	end
 	surface.set_tiles(tiles)
 
+	-- Initial chart
+	session.player.force.chart(surface, EDITOR_CHART_AREA)
+
+	-- Energy source
+	local eei = surface.create_entity({
+		name = EDITOR_ENERGY_SOURCE_NAME,
+		position = { EDITOR_SIZE / 2 + 4, 10 },
+		force = session.player.force,
+	})
+	if not eei then
+		strace.error("Failed to create editor energy source entity")
+	end
+
+	-- Radar
+	local radar = surface.create_entity({
+		name = EDITOR_RADAR_NAME,
+		position = { 0, 0 },
+		force = session.player.force,
+	})
+	if not radar then
+		strace.error("Failed to create editor radar entity")
+	else
+		radar.operable = false
+		radar.destructible = false
+		radar.minable = false
+	end
+
 	return surface
-end
-
----@param surface LuaSurface
----@param force string|integer|LuaForce
-local function prepare_surface_for_force(surface, force)
-	force.set_surface_hidden(surface, true)
-	force.chart(surface, EDITOR_CHART_AREA)
-end
-
----@param surface LuaSurface
----@param force string|integer|LuaForce|nil
----@param name string
----@param position MapPosition
----@return LuaEntity?
-local function ensure_single_editor_entity(surface, force, name, position)
-	local entities =
-		surface.find_entities_filtered({ name = name, force = force })
-	local entity = nil
-	for _, existing in ipairs(entities) do
-		if not entity then
-			entity = existing
-		else
-			existing.destroy()
-		end
-	end
-
-	if not entity then
-		entity = surface.create_entity({
-			name = name,
-			position = position,
-			force = force,
-		})
-	end
-
-	if entity then
-		entity.destructible = false
-		entity.operable = false
-		entity.minable = false
-	end
-
-	return entity
-end
-
----@param surface LuaSurface
----@param force string|integer|LuaForce
-local function connect_editor_infra(surface, force)
-	local source_proto = prototypes.entity[EDITOR_ENERGY_SOURCE_NAME]
-	if source_proto then
-		ensure_single_editor_entity(
-			surface,
-			nil,
-			EDITOR_ENERGY_SOURCE_NAME,
-			{ EDITOR_SIZE / 2 + 4, 10 }
-		)
-	end
-
-	local radar_proto = prototypes.entity[EDITOR_RADAR_NAME]
-	if radar_proto then
-		ensure_single_editor_entity(surface, force, EDITOR_RADAR_NAME, { 0, 0 })
-	end
-end
-
----@param session_id ID
----@return LuaSurface
-local function get_or_create_editor_surface(session_id)
-	local surface_to_session = get_surface_to_session()
-
-	---@param surface LuaSurface
-	---@return LuaSurface
-	local function claim_surface(surface)
-		surface_to_session[surface.index] = session_id
-		return surface
-	end
-
-	local hot_surface = storage.editor_hot_surface
-	if not hot_surface or not hot_surface.valid then
-		hot_surface = game.get_surface(EDITOR_SURFACE_PREFIX .. "hot")
-	end
-	if not hot_surface or not hot_surface.valid then
-		hot_surface = create_editor_surface(EDITOR_SURFACE_PREFIX .. "hot")
-	end
-	storage.editor_hot_surface = hot_surface
-	if surface_to_session[hot_surface.index] == nil then
-		return claim_surface(hot_surface)
-	end
-
-	while true do
-		local next_id = counters.next("die_shrink_editor_surface")
-		local surface_name = EDITOR_SURFACE_PREFIX .. tostring(next_id)
-
-		local existing = game.get_surface(surface_name)
-		if not existing then
-			local new_surface = create_editor_surface(surface_name)
-			return claim_surface(new_surface)
-		end
-	end
 end
 
 ---@param surface LuaSurface
@@ -358,16 +292,7 @@ local function release_editor_surface(surface, session_id)
 	end
 
 	clear_editor_surface(surface)
-
-	local hot_surface = storage.editor_hot_surface
-	if not hot_surface or not hot_surface.valid then
-		storage.editor_hot_surface = nil
-		hot_surface = nil
-	end
-
-	if not hot_surface or surface.index ~= hot_surface.index then
-		game.delete_surface(surface)
-	end
+	game.delete_surface(surface)
 end
 
 ---@param session DieShrink.EditorSession
@@ -480,18 +405,27 @@ local function get_recentered_build_position(bp_entities)
 end
 
 ---@param surface LuaSurface
----@param force any
+---@param force LuaForce
 ---@param blueprint string
 local function restore_editor_blueprint(surface, force, blueprint)
 	strace.trace("--- RESTORE_EDITOR_BLUEPRINT")
+	strace.trace(
+		"Restoring blueprint",
+		surface.name,
+		surface.valid,
+		force,
+		blueprint
+	)
+
 	local inv = game.create_inventory(1)
 	local bp = inv[1]
 	bp.set_stack({ name = "blueprint", count = 1 })
 	local import_result = bp.import_stack(blueprint)
 	if import_result ~= 1 then
-		local build_position = get_recentered_build_position(
-			bp.get_blueprint_entities()
-		) or { 0, 0 }
+		local entities = bp.get_blueprint_entities()
+		strace.trace("Restoring blueprint entities", entities)
+		local build_position = get_recentered_build_position(entities) or { 0, 0 }
+		strace.trace("Build position", build_position)
 		remote.call(
 			"things",
 			"script_prebuild_blueprint",
@@ -501,19 +435,19 @@ local function restore_editor_blueprint(surface, force, blueprint)
 			{ position = build_position, direction = defines.direction.north },
 			defines.build_mode.forced
 		)
-		local built = bp.build_blueprint({
+		local build_args = {
 			surface = surface,
 			force = force,
 			position = build_position,
 			build_mode = defines.build_mode.forced,
 			skip_fog_of_war = true,
-		})
-		if built then
-			for _, entity in pairs(built) do
-				if entity and entity.valid and entity.name == "entity-ghost" then
-					handle_built_ghost(entity, nil)
-				end
-			end
+		}
+		strace.trace("build_blueprint with build args", build_args)
+		local built = bp.build_blueprint(build_args)
+		strace.trace("Built entities", built)
+
+		for _, entity in pairs(built) do
+			if entity.name == "entity-ghost" then handle_built_ghost(entity, nil) end
 		end
 	end
 	inv.destroy()
@@ -542,24 +476,22 @@ local function save_editor_session(session_id)
 
 	local force = player.force --[[@as LuaForce]]
 
-	---@type string?
 	local blueprint = capture_editor_blueprint(session, surface, force)
-	local set_error
+
 	if blueprint then
-		local blueprint_content = blueprint --[[@as string]]
-		set_error = remote.call(
-			"things",
-			"set_tag",
-			ic.thing_id,
-			"blueprint",
-			blueprint_content
-		)
+		strace.trace("Saving ic tags", ic.thing_id, "with blueprint", blueprint)
+		remote.call("things", "set_tag", ic.thing_id, "blueprint", blueprint)
 	else
 		local tags = shallow_copy_tags(thing.tags)
 		tags.blueprint = nil
 		set_error = remote.call("things", "set_tags", ic.thing_id, tags)
 	end
 end
+
+scheduler.register_handler(
+	"load_session",
+	function(task) restore_editor_blueprint(table.unpack(task.data, 2)) end
+)
 
 ---@param player LuaPlayer
 ---@param ic DieShrink.IC
@@ -571,16 +503,17 @@ local function open_editor_for_ic(player, ic)
 	local player_state = get_or_create_player_state(player.index)
 	player_state:push_editor_session(session.id)
 
-	local surface = get_or_create_editor_surface(session.id)
-	session.surface = surface
-	prepare_surface_for_force(surface, player.force --[[@as LuaForce]])
-	connect_editor_infra(surface, player.force --[[@as LuaForce]])
+	local surface = create_editor_surface(session)
 
 	local blueprint = thing.tags and thing.tags.blueprint
 	if type(blueprint) == "string" and blueprint ~= "" then
 		local blueprint_content = blueprint --[[@as string]]
 		local player_force = player.force --[[@as LuaForce]]
-		restore_editor_blueprint(surface, player_force, blueprint_content)
+		scheduler.after(
+			1,
+			"load_session",
+			{ session, surface, player_force, blueprint_content }
+		)
 	end
 
 	player.set_controller({
