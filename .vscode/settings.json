@@ -18,5 +18,8 @@
     "editor.defaultFormatter": "JohnnyMorganz.stylua",
     "editor.formatOnSave": true
   },
-  "stylua.targetReleaseVersion": "latest"
+  "stylua.targetReleaseVersion": "latest",
+  "chat.tools.terminal.autoApprove": {
+    "ForEach-Object": true
+  }
 }
