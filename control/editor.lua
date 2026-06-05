@@ -13,8 +13,11 @@ local scheduler = require("lib.core.scheduler")
 local EMPTY = tlib.EMPTY
 
 local EDITOR_SURFACE_PREFIX = "die-shrink-editor-s-"
-local EDITOR_SIZE = 64
-local EDITOR_ENTRY_MIN_ZOOM = 0.75
+local EDITOR_SIZE = 32
+local EDITOR_GENERATION_PADDING = 2
+local EDITOR_CHUNK_RADIUS =
+	math.max(2, math.ceil((EDITOR_SIZE / 2 + EDITOR_GENERATION_PADDING) / 32))
+local EDITOR_ENTRY_MIN_ZOOM = 1
 local EDITOR_ENERGY_SOURCE_NAME = constants.mod_prefix
 	.. "-editor-energy-source"
 local EDITOR_RADAR_NAME = constants.mod_prefix .. "-editor-radar"
@@ -216,7 +219,7 @@ local function create_editor_surface(session)
 	surface.daytime = 0.5
 	surface.freeze_daytime = true
 	surface.show_clouds = false
-	surface.request_to_generate_chunks({ 0, 0 }, 4)
+	surface.request_to_generate_chunks({ 0, 0 }, EDITOR_CHUNK_RADIUS)
 	surface.force_generate_chunk_requests()
 	surface.create_global_electric_network()
 
