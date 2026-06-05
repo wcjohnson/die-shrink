@@ -1,5 +1,7 @@
 local collision_mask_util = require("collision-mask-util")
 local constants = require("lib.constants")
+local tlib = require("lib.core.table")
+local data_util = require("lib.core.data-util")
 
 -- Internal radar to keep editor surfaces charted.
 ---@type data.RadarPrototype
@@ -68,18 +70,41 @@ local energy_source = {
 }
 data:extend({ energy_source })
 
+---@type data.WireConnectionPoint
+local ZERO_CONNECTION_POINT = {
+	wire = { green = { 0, 0 }, red = { 0, 0 } },
+	shadow = { green = { 0, 0 }, red = { 0, 0 } },
+}
+
+---@type data.RotatedSprite
+local pad_pictures = {
+	layers = {
+		data_util.sprite_to_rotated(
+			data.raw["lamp"]["small-lamp"].picture_off.layers[1]
+		),
+		data_util.sprite_to_rotated(
+			data.raw["lamp"]["small-lamp"].picture_off.layers[2]
+		),
+	},
+}
+
 -- Buildable internal pad to bond to external pins
----@type data.ContainerPrototype
+---@type data.ElectricPolePrototype
 local pad = {
 	-- PrototypeBase
-	type = "container",
+	type = "electric-pole",
 	name = constants.pad_name,
 	hidden_in_factoriopedia = true,
 
-	-- ContainerPrototype
-	inventory_size = 0,
-	picture = data.raw["lamp"]["small-lamp"].picture_off,
-	circuit_wire_max_distance = constants.circuit_wire_max_distance,
+	-- ElectricPolePrototype
+	supply_area_distance = 0,
+	auto_connect_up_to_n_wires = 0,
+	rewire_neighbours_when_destroying = false,
+	connection_points = {
+		ZERO_CONNECTION_POINT,
+	},
+	pictures = pad_pictures,
+	maximum_wire_distance = constants.circuit_wire_max_distance,
 	draw_copper_wires = false,
 	draw_circuit_wires = true,
 
@@ -92,6 +117,7 @@ local pad = {
 	collision_box = data.raw["lamp"]["small-lamp"].collision_box,
 	collision_mask = data.raw["lamp"]["small-lamp"].collision_mask,
 	selection_box = data.raw["lamp"]["small-lamp"].selection_box,
+	fast_replaceable_group = nil,
 	flags = {
 		"not-on-map",
 		"hide-alt-info",

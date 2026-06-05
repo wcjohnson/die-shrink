@@ -210,7 +210,7 @@ local function create_editor_surface(session)
 	surface_to_session[surface.index] = session.id
 	session.surface = surface
 	for _, force in pairs(game.forces) do
-		-- force.set_surface_hidden(surface, true)
+		force.set_surface_hidden(surface, true)
 	end
 	surface.always_day = true
 	surface.daytime = 0.5
@@ -255,7 +255,7 @@ local function create_editor_surface(session)
 		strace.error("Failed to create editor energy source entity")
 	end
 
-	-- Radar
+	-- Hidden Radar
 	local radar = surface.create_entity({
 		name = EDITOR_RADAR_NAME,
 		position = { 0, 0 },
