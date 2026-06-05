@@ -1,6 +1,5 @@
 ---Circuit connector pins.
 
-local collision_mask_util = require("collision-mask-util")
 local constants = require("lib.constants")
 
 ---@type data.Sprite
@@ -32,7 +31,7 @@ local pin = {
 	icon = __GRAPHICS_PATH__ .. "icon-jumper-wire.png",
 	icon_size = 256,
 	collision_box = { { -0.1, -0.1 }, { 0.1, 0.1 } },
-	collision_mask = collision_mask_util.new_mask(),
+	collision_mask = { layers = {} },
 	selection_box = { { -0.1, -0.1 }, { 0.1, 0.1 } },
 	flags = {
 		"placeable-off-grid",

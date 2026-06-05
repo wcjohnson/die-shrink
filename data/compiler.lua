@@ -52,6 +52,7 @@ local base_prototype = {
 	selection_box = { { -0.01, -0.01 }, { 0.01, 0.01 } },
 	minable = nil,
 	selectable_in_game = false,
+	allow_copy_paste = false,
 	created_smoke = nil,
 
 	-- CombinatorPrototype
@@ -133,3 +134,43 @@ data:extend({
 	decider_combinator,
 	selector_combinator,
 })
+
+-- Invisible container for internal pad connections
+---@type data.ContainerPrototype
+local pad_connector = {
+	-- PrototypeBase
+	type = "container",
+	name = constants.mod_prefix .. "-pad-connector",
+	hidden_in_factoriopedia = true,
+
+	-- ContainerPrototype
+	inventory_size = 0,
+	circuit_wire_max_distance = constants.circuit_wire_max_distance,
+	draw_copper_wires = false,
+	draw_circuit_wires = false,
+
+	-- EntityWithHealthPrototype
+	max_health = 1,
+
+	-- EntityPrototype
+	flags = {
+		"placeable-off-grid",
+		"not-on-map",
+		"not-blueprintable",
+		"not-deconstructable",
+		"not-upgradable",
+		"hide-alt-info",
+	},
+	collision_mask = { layers = {} },
+	collision_box = {
+		{ -TINY_BOX_SIZE, -TINY_BOX_SIZE },
+		{ TINY_BOX_SIZE, TINY_BOX_SIZE },
+	},
+	selection_box = { { -0.01, -0.01 }, { 0.01, 0.01 } },
+	minable = nil,
+	selectable_in_game = false,
+	allow_copy_paste = false,
+	created_smoke = nil,
+}
+
+data:extend({ pad_connector })
