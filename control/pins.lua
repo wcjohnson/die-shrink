@@ -2,6 +2,9 @@
 
 local event = require("lib.core.event")
 local strace = require("lib.core.strace")
+local orientation_lib = require("lib.core.orientation.orientation")
+local pos_lib = require("lib.core.math.pos")
+local constants = require("lib.constants")
 
 ---@param pin LuaEntity?
 local function disconnect_one_pin_entirely(pin)
@@ -96,6 +99,219 @@ local function connect_one_neighbor(my_pins, neighbor_id)
 	local _, neighbor_pins = remote.call("things", "get_children", neighbor_id)
 	connect_each_pin(my_pins, neighbor_pins)
 end
+
+--------------------------------------------------------------------------------
+-- DYNAMIC PIN CREATION
+--------------------------------------------------------------------------------
+
+local PIN_OFFSET = 0.4
+local INNER_PIN_OFFSET = 0.2
+
+local pin_layouts = {
+	[0] = {},
+	[2] = { { -PIN_OFFSET, 0 }, { PIN_OFFSET, 0 } },
+	[4] = {
+		{ 0, -PIN_OFFSET },
+		{ PIN_OFFSET, 0 },
+		{ 0, PIN_OFFSET },
+		{ -PIN_OFFSET, 0 },
+	},
+	[8] = {
+		{ 0, -PIN_OFFSET },
+		{ PIN_OFFSET, -PIN_OFFSET },
+		{ PIN_OFFSET, 0 },
+		{ PIN_OFFSET, PIN_OFFSET },
+		{ 0, PIN_OFFSET },
+		{ -PIN_OFFSET, PIN_OFFSET },
+		{ -PIN_OFFSET, 0 },
+		{ -PIN_OFFSET, -PIN_OFFSET },
+	},
+	[16] = {
+		{ 0, -PIN_OFFSET },
+		{ PIN_OFFSET, -PIN_OFFSET },
+		{ PIN_OFFSET, 0 },
+		{ PIN_OFFSET, PIN_OFFSET },
+		{ 0, PIN_OFFSET },
+		{ -PIN_OFFSET, PIN_OFFSET },
+		{ -PIN_OFFSET, 0 },
+		{ -PIN_OFFSET, -PIN_OFFSET },
+		{ 0, -INNER_PIN_OFFSET },
+		{ INNER_PIN_OFFSET, -INNER_PIN_OFFSET },
+		{ INNER_PIN_OFFSET, 0 },
+		{ INNER_PIN_OFFSET, INNER_PIN_OFFSET },
+		{ 0, INNER_PIN_OFFSET },
+		{ -INNER_PIN_OFFSET, INNER_PIN_OFFSET },
+		{ -INNER_PIN_OFFSET, 0 },
+		{ -INNER_PIN_OFFSET, -INNER_PIN_OFFSET },
+	},
+}
+
+---@param parent_pos MapPosition
+---@param parent_orientation Core.Orientation?
+---@param offset MapPosition
+---@return MapPosition
+local function offset_pos(parent_pos, parent_orientation, offset)
+	if parent_orientation then
+		offset = orientation_lib.transform_vector(parent_orientation, offset)
+	end
+	local offset_x, offset_y = pos_lib.pos_get(offset)
+	local parent_x, parent_y = pos_lib.pos_get(parent_pos)
+	return { parent_x + offset_x, parent_y + offset_y }
+end
+
+---@param parent_entity LuaEntity
+---@param pos MapPosition
+local function create_pin_entity(parent_entity, pos)
+	return parent_entity.surface.create_entity({
+		name = constants.pin_name,
+		position = pos,
+		force = parent_entity.force,
+		raise_built = false,
+		create_build_effect_smoke = false,
+	})
+end
+
+local function create_pin_thing(parent, child_entity, index, offset)
+	remote.call("things", "create_thing", {
+		entity = child_entity,
+		parent = parent.id,
+		child_index = index,
+		relative_pos = offset,
+	})
+end
+
+local function devoid_pin_thing(child_id, child_entity)
+	remote.call("things", "create_thing", {
+		devoid = child_id,
+		entity = child_entity,
+	})
+end
+
+---@param parent things.ThingSummary
+---@param n_pins 0|2|4|8|16
+---@param ic DieShrink.IC
+local function check_pins(parent, n_pins, ic)
+	local pin_layout = pin_layouts[n_pins]
+	if not pin_layout then
+		error("LOGIC ERROR: invalid number of pins: " .. n_pins)
+		return
+	end
+
+	local did_work = false
+	local parent_pos = parent.entity.position
+	local parent_status = parent.status
+	local child_should_live = parent_status == "real" or parent_status == "ghost"
+
+	local _, children = remote.call("things", "get_children", parent.id)
+	for i = 1, n_pins do
+		local pin_index = tostring(i)
+		local pin_offset = pin_layout[i]
+		local child = children and children[pin_index]
+
+		if (not child) and child_should_live then
+			-- Must create entity and thing
+			local child_pos =
+				offset_pos(parent_pos, parent.virtual_orientation, pin_offset)
+			local child_entity = create_pin_entity(parent.entity, child_pos)
+			if child_entity then
+				create_pin_thing(parent, child_entity, pin_index, pin_offset)
+				strace.trace("created pin", pin_index, "of cpu", parent.id)
+				did_work = true
+			else
+				strace.error("Failed to create pin entity for thing", parent.id)
+			end
+		elseif child and (child.status == "void") and child_should_live then
+			-- Must create entity and devoid thing
+			local child_pos =
+				offset_pos(parent_pos, parent.virtual_orientation, pin_offset)
+			local child_entity = create_pin_entity(parent.entity, child_pos)
+			if child_entity then
+				devoid_pin_thing(child.id, child_entity)
+				strace.trace("devoided pin", pin_index, "of cpu", parent.id)
+				did_work = true
+			else
+				strace.error("Failed to create pin entity for thing", parent.id)
+			end
+		elseif child and (child.status ~= "void") and not child_should_live then
+			remote.call("things", "void", child.id)
+			did_work = true
+		end
+	end
+
+	if did_work then event.raise("dieshrink.ic_children_normalized", ic) end
+end
+
+event.bind(
+	"die-shrink-on_initialized",
+	---@param thing things.EventData.on_initialized
+	function(thing)
+		-- Create IC state
+		local ic = IC:new(thing.id)
+		-- Initial n_pins
+		local n_pins_tag = thing.tags and thing.tags.n_pins
+		if n_pins_tag then
+			ic.n_pins = n_pins_tag
+		else
+			local _, n_children = remote.call("things", "get_num_children", thing.id)
+			n_children = n_children or 0
+			if n_children > 8 then
+				n_children = 16
+			elseif n_children > 4 then
+				n_children = 8
+			elseif n_children > 2 then
+				n_children = 4
+			elseif n_children > 0 then
+				n_children = 2
+			else
+				n_children = 0
+			end
+			ic.n_pins = n_children
+		end
+		strace.trace("Initialized ic", ic.thing_id, "with", ic.n_pins, "pins")
+		-- Create pins
+		check_pins(thing, ic:get_n_pins(), ic)
+	end
+)
+
+event.bind("dieshrink.ic_pins_changed", function(ic)
+	local _, thing = remote.call("things", "get", ic.thing_id)
+	if not thing then return end
+	local n_pins = ic:get_n_pins()
+	remote.call("things", "set_tag", thing.id, "n_pins", n_pins)
+	check_pins(thing, n_pins, ic)
+end)
+
+event.bind(
+	"die-shrink-on_status",
+	---@param ev things.EventData.on_status
+	function(ev)
+		strace.trace("die-shrink-on_status", ev)
+		local old_status = ev.old_status
+		local new_status = ev.new_status
+		local ic = get_ic_state(ev.thing.id)
+
+		if new_status == "destroyed" then
+			-- Destroy IC state
+			if ic then ic:destroy() end
+			return
+		end
+
+		if
+			old_status == "void"
+			or new_status == "ghost"
+			or new_status == "real"
+		then
+			-- Check pins in all non-void states
+			if ic then check_pins(ev.thing, ic:get_n_pins(), ic) end
+		end
+
+		-- local entity, ic = get_ic_info(ev.thing, false)
+
+		if ev.old_status == "ghost" and ev.new_status == "real" then
+			-- Connect to all neighbors on revival.
+		end
+	end
+)
 
 --------------------------------------------------------------------------------
 -- PIN LABELS

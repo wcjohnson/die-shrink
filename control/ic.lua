@@ -8,11 +8,12 @@ local strace = require("lib.core.strace")
 
 ---@class DieShrink.IC
 ---@field thing_id ThingID
+---@field n_pins uint
 local IC = class("DieShrink.IC")
 _G.IC = IC
 
 function IC:new(thing_id)
-	local obj = setmetatable({ thing_id = thing_id }, self)
+	local obj = setmetatable({ thing_id = thing_id, n_pins = 0 }, self)
 	local ics = storage.ics
 	if not ics then
 		ics = {}
@@ -22,50 +23,25 @@ function IC:new(thing_id)
 	return obj
 end
 
-function IC:get_n_pins() return 16 end
+function IC:get_n_pins() return self.n_pins end
+
+function IC:set_n_pins(n)
+	if self.n_pins == n then return end
+	if self.n_pins ~= 0 then
+		strace.error(
+			"Attempted to change number of pins on IC",
+			self.thing_id,
+			"from",
+			self.n_pins,
+			"to",
+			n
+		)
+		return
+	end
+	self.n_pins = n
+	event.raise("dieshrink.ic_pins_changed", self)
+end
 
 function IC:destroy() storage.ics[self.thing_id] = nil end
-
-event.bind(
-	"die-shrink-on_initialized",
-	---@param ev things.EventData.on_initialized
-	function(ev)
-		-- Create IC state
-		local ic = IC:new(ev.id)
-	end
-)
-
-event.bind(
-	"die-shrink-on_status",
-	---@param ev things.EventData.on_status
-	function(ev)
-		strace.trace("die-shrink-on_status", ev)
-		if ev.new_status == "destroyed" then
-			-- Destroy IC state
-			local ic = get_ic_state(ev.thing.id)
-			if ic then ic:destroy() end
-			return
-		end
-		-- local entity, ic = get_ic_info(ev.thing, false)
-
-		if ev.old_status == "ghost" and ev.new_status == "real" then
-			-- Connect to all neighbors on revival.
-		end
-	end
-)
-
-event.bind(
-	"die-shrink-on_children_normalized",
-	---@param ev things.EventData.on_children_normalized
-	function(ev)
-		strace.trace("die-shrink-on_children_normalized", ev)
-		-- Reconnect to all neighbors if not ghost
-		if ev.status == "real" then
-			local _, pins = remote.call("things", "get_children", ev.id)
-			-- Disconnect all neighbors
-			-- Connect all neighbors
-		end
-	end
-)
 
 return IC

@@ -18,6 +18,7 @@ lib.IcUi = relm.define("IcUi", function(props)
 	local player_index = props.player_index
 	local player = game.get_player(player_index)
 	local ic = props.ic --[[@as DieShrink.IC]]
+	local n_pins = ic:get_n_pins()
 
 	if (not player) or not player.valid then return end
 
@@ -38,16 +39,42 @@ lib.IcUi = relm.define("IcUi", function(props)
 	relm_util.use_event_handler(
 		"dieshrink.editor_session_opened",
 		function(_, _, _session)
-			if _session and _session.player.index == player_index then
-				close_me()
-			end
+			if _session and _session.player.index == player_index then close_me() end
 		end
 	)
+
+	relm_util.use_event_handler("dieshrink.ic_pins_changed", function(_me, _, _ic)
+		if _ic.thing_id == ic.thing_id then relm.paint(_me) end
+	end)
 
 	return ultros.WindowFrame({
 		caption = "IC",
 		on_close = handle_close,
 	}, {
+		ultros.CallIf(n_pins == 0, function()
+			return HF({ width = 300 }, {
+				ultros.Button({
+					caption = "2 pins",
+					width = 300 / 4,
+					on_click = function() ic:set_n_pins(2) end,
+				}),
+				ultros.Button({
+					caption = "4 pins",
+					width = 300 / 4,
+					on_click = function() ic:set_n_pins(4) end,
+				}),
+				ultros.Button({
+					caption = "8 pins",
+					width = 300 / 4,
+					on_click = function() ic:set_n_pins(8) end,
+				}),
+				ultros.Button({
+					caption = "16 pins",
+					width = 300 / 4,
+					on_click = function() ic:set_n_pins(16) end,
+				}),
+			})
+		end),
 		HF({ width = 300 }, {
 			ultros.Button({
 				caption = "Open Editor",
