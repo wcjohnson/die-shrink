@@ -761,7 +761,7 @@ function _G.close_editor_session(session_id)
 	save_editor_session(session_id)
 	release_editor_surface(session.surface, session_id)
 	session:destroy()
-	event.raise("dieshrink.editor_session_closed", session)
+	event.raise("dieshrink.editor_session_closed", session, true)
 
 	---@type LuaPlayer?
 	local player = session.player

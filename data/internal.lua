@@ -1,4 +1,3 @@
-local collision_mask_util = require("collision-mask-util")
 local constants = require("lib.constants")
 local tlib = require("lib.core.table")
 local data_util = require("lib.core.data-util")
@@ -104,7 +103,7 @@ local pad = {
 		ZERO_CONNECTION_POINT,
 	},
 	pictures = pad_pictures,
-	maximum_wire_distance = constants.circuit_wire_max_distance,
+	maximum_wire_distance = constants.editor_surface_size,
 	draw_copper_wires = false,
 	draw_circuit_wires = true,
 

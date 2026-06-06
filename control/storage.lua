@@ -32,3 +32,16 @@ end
 ---@param thing_id ThingID
 ---@return DieShrink.IC?
 function _G.get_ic_state(thing_id) return storage.ics and storage.ics[thing_id] end
+
+function _G.get_or_create_ic_state(thing_id)
+	local ics = storage.ics
+	if not ics then
+		ics = {}
+		storage.ics = ics
+	end
+	local ic = ics[thing_id]
+	if ic then return ic end
+	ic = IC:new(thing_id)
+	ics[thing_id] = ic
+	return ic
+end

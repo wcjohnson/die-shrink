@@ -4,6 +4,7 @@
 
 local constants = require("lib.constants")
 local tlib = require("lib.core.table")
+local strace = require("lib.core.strace")
 
 local pairs = pairs
 local next = next
@@ -30,7 +31,7 @@ local PAD_CONNECTOR_NAME = constants.mod_prefix .. "-pad-connector"
 ---@return uint? pin_number Pin number within parent IC.
 local function get_pin_info_from_tags(pin_tags)
 	local _, _, tags, parent_index =
-		remote.call("things-metadata-v1", "decode_tags", pin_tags)
+		remote.call("things-metadata-v1", "decode_blueprint_tags", pin_tags)
 	return parent_index, tags and tags.n --[[@as uint?]]
 end
 
@@ -38,7 +39,8 @@ end
 ---@return string? blueprint_string
 local function get_ic_blueprint_string_from_tags(ic_tags)
 	if not ic_tags then return nil end
-	local _, _, tags = remote.call("things-metadata-v1", "decode_tags", ic_tags)
+	local _, _, tags =
+		remote.call("things-metadata-v1", "decode_blueprint_tags", ic_tags)
 	return tags and tags.blueprint --[[@as string?]]
 end
 
@@ -67,12 +69,15 @@ end
 local function add_wire(wires, dedupe, a, a_connector, b, b_connector)
 	if not a or not b or a == b then return end
 	local left = min(a, b)
+	local left_connector = a == left and a_connector or b_connector
 	local right = max(a, b)
-	local proposed_wire = { left, a_connector, right, b_connector }
+	local right_connector = a == left and b_connector or a_connector
+	local proposed_wire = { left, left_connector, right, right_connector }
 	local key = tconcat(proposed_wire, ":")
-	if dedupe[key] then return end
+	if dedupe[key] then return false end
 	dedupe[key] = true
 	wires[#wires + 1] = proposed_wire
+	return true
 end
 
 ---@param pad_map {[uint]: uint[]}
@@ -97,11 +102,13 @@ local function compile(bp_entities, recursion_level)
 
 	-- Compile string if needed
 	if type(bp_entities) == "string" then
+		strace.trace("Compiling from blueprint string")
 		local inv = game.create_inventory(1)
 		local bp = inv[1]
 		bp.set_stack({ name = "blueprint", count = 1 })
 		local import_result = bp.import_stack(bp_entities)
 		if import_result == 1 then
+			strace.error("Failed to import blueprint string for compilation")
 			inv.destroy()
 			return nil
 		end
@@ -110,6 +117,7 @@ local function compile(bp_entities, recursion_level)
 	end
 	---@cast bp_entities BlueprintEntity[]
 
+	strace.trace("Compiling from", #bp_entities, "blueprint entities")
 	local level = recursion_level or 0
 	local do_layout_positions = level == 0
 	local get_next_position
@@ -167,6 +175,14 @@ local function compile(bp_entities, recursion_level)
 				direction = bp_entity.direction,
 				control_behavior = bp_entity.control_behavior,
 			}
+			strace.trace(
+				"Index",
+				combinator_index,
+				"is",
+				combinator_name,
+				"bp_index",
+				bp_index
+			)
 			result_entities[combinator_index] = param
 			bp_to_compiled[bp_index] = combinator_index
 		elseif entity_name == constants.pad_name then
@@ -181,8 +197,15 @@ local function compile(bp_entities, recursion_level)
 					direction = bp_entity.direction,
 				}
 				bp_to_compiled[bp_index] = connector_index
-
 				add_pad_mapping(result.pad_map, pin_number, connector_index)
+				strace.trace(
+					"Index",
+					connector_index,
+					"is a connector pad for pin",
+					pin_number,
+					"bp_index",
+					bp_index
+				)
 				if tags and tags.label then
 					result.labels[pin_number] = tostring(tags.label)
 				end

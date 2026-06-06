@@ -11,6 +11,7 @@ data:extend({
 	{ type = "custom-event", name = "die-shrink-on_status" },
 	{ type = "custom-event", name = "die-shrink-on_orientation_changed" },
 	{ type = "custom-event", name = "die-shrink-on_children_normalized" },
+	{ type = "custom-event", name = "die-shrink-on_tags_changed" },
 	{ type = "custom-event", name = "die-shrink-on_pin_status" },
 	{ type = "custom-event", name = "die-shrink-on_pin_immediate_voided" },
 	{
@@ -33,6 +34,7 @@ local ic_registration = {
 		on_status = "die-shrink-on_status",
 		on_children_normalized = "die-shrink-on_children_normalized",
 		on_orientation_changed = "die-shrink-on_orientation_changed",
+		on_tags_changed = "die-shrink-on_tags_changed",
 	},
 }
 data.raw["mod-data"]["things-names"].data["die-shrink-ic"] = ic_registration
