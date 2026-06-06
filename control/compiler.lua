@@ -1,0 +1,315 @@
+--------------------------------------------------------------------------------
+-- CIRCUIT COMPILER
+--------------------------------------------------------------------------------
+
+local constants = require("lib.constants")
+local tlib = require("lib.core.table")
+
+local pairs = pairs
+local next = next
+local type = type
+local min = math.min
+local max = math.max
+local tconcat = table.concat
+
+local lib = {}
+
+local COMBINATOR_ENTITY_MAP = {
+	["constant-combinator"] = constants.mod_prefix .. "-constant-combinator",
+	["arithmetic-combinator"] = constants.mod_prefix .. "-arithmetic-combinator",
+	["decider-combinator"] = constants.mod_prefix .. "-decider-combinator",
+	["selector-combinator"] = constants.mod_prefix .. "-selector-combinator",
+}
+
+local PAD_CONNECTOR_NAME = constants.mod_prefix .. "-pad-connector"
+
+---Given the blueprint tags of a pin, return the blueprint entity index of
+---the parent processor within the pin's blueprint.
+---@param pin_tags Tags The tags of a pin entity within a blueprint.
+---@return uint? ic_index The blueprint entity index of the parent processor, or nil if it can't be determined.
+---@return uint? pin_number Pin number within parent IC.
+local function get_pin_info_from_tags(pin_tags)
+	local _, _, tags, parent_index =
+		remote.call("things-metadata-v1", "decode_tags", pin_tags)
+	return parent_index, tags and tags.n --[[@as uint?]]
+end
+
+---@param ic_tags Tags?
+---@return string? blueprint_string
+local function get_ic_blueprint_string_from_tags(ic_tags)
+	if not ic_tags then return nil end
+	local _, _, tags = remote.call("things-metadata-v1", "decode_tags", ic_tags)
+	return tags and tags.blueprint --[[@as string?]]
+end
+
+---@class DieShrink.CompilerResult
+---@field entities LuaSurface.create_entity_param[]
+---@field wires [uint,defines.wire_connector_id,uint,defines.wire_connector_id][] List of wires between entities that should be restored when building.
+---@field labels {[uint]: string} Mapping of pin index to label text
+---@field pad_map {[uint]: uint[]} Mapping of external IC pin number to corresponding pad connector indices within `entities`.
+
+---@return DieShrink.CompilerResult
+local function create_empty_result()
+	return {
+		entities = {},
+		wires = {},
+		labels = {},
+		pad_map = {},
+	}
+end
+
+---@param wires [uint, uint][]
+---@param dedupe {[string]: boolean}
+---@param a uint
+---@param a_connector defines.wire_connector_id
+---@param b uint
+---@param b_connector defines.wire_connector_id
+local function add_wire(wires, dedupe, a, a_connector, b, b_connector)
+	if not a or not b or a == b then return end
+	local left = min(a, b)
+	local right = max(a, b)
+	local proposed_wire = { left, a_connector, right, b_connector }
+	local key = tconcat(proposed_wire, ":")
+	if dedupe[key] then return end
+	dedupe[key] = true
+	wires[#wires + 1] = proposed_wire
+end
+
+---@param pad_map {[uint]: uint[]}
+---@param pad_number uint?
+---@param connector_index uint?
+local function add_pad_mapping(pad_map, pad_number, connector_index)
+	if not pad_number or not connector_index then return end
+	local mapped = pad_map[pad_number]
+	if not mapped then
+		mapped = {}
+		pad_map[pad_number] = mapped
+	end
+	mapped[#mapped + 1] = connector_index
+end
+
+---Compile a circuit from its editor blueprint.
+---@param bp_entities string|BlueprintEntity[]
+---@param recursion_level? uint
+---@return DieShrink.CompilerResult? result The compiled circuit, or nil if compilation failed.
+local function compile(bp_entities, recursion_level)
+	local result = create_empty_result()
+
+	-- Compile string if needed
+	if type(bp_entities) == "string" then
+		local inv = game.create_inventory(1)
+		local bp = inv[1]
+		bp.set_stack({ name = "blueprint", count = 1 })
+		local import_result = bp.import_stack(bp_entities)
+		if import_result == 1 then
+			inv.destroy()
+			return nil
+		end
+		bp_entities = bp.get_blueprint_entities() or {}
+		inv.destroy()
+	end
+	---@cast bp_entities BlueprintEntity[]
+
+	local level = recursion_level or 0
+	local do_layout_positions = level == 0
+	local get_next_position
+	do
+		local min_x = -0.45
+		local min_y = -0.45
+		local max_x = 0.45
+		local max_y = 0.45
+		local step = 0.03
+		local span_x = max_x - min_x
+		local span_y = max_y - min_y
+		local columns = math.max(1, math.floor(span_x / step + 0.5) + 1)
+		local rows = math.max(1, math.floor(span_y / step + 0.5) + 1)
+		local ix = 0
+		local iy = 0
+
+		get_next_position = function()
+			if not do_layout_positions then return { 0, 0 } end
+			local pos = {
+				min_x + ix * step,
+				min_y + iy * step,
+			}
+			ix = ix + 1
+			if ix >= columns then
+				ix = 0
+				iy = iy + 1
+				if iy >= rows then iy = 0 end
+			end
+			return pos
+		end
+	end
+
+	local result_entities = result.entities
+
+	---Map from bp indices to compiled indices
+	---@type {[uint]: uint}
+	local bp_to_compiled = {}
+	---Embedded ICs. (bp index of ic) -> (pin number -> bp index of pin)
+	---@type {[uint]: {[uint]: uint}}
+	local bp_ics = {}
+	---Pins (bp index of pin) -> [bp index of IC, pin number]
+	---@type {[uint]: [uint, uint]}
+	local bp_pins = {}
+
+	-- PASS 1: CLASSIFICATION
+	for bp_index, bp_entity in pairs(bp_entities) do
+		local entity_name = bp_entity.name
+		local combinator_name = COMBINATOR_ENTITY_MAP[entity_name]
+
+		if combinator_name then
+			local combinator_index = #result_entities + 1
+			local param = {
+				name = combinator_name,
+				position = get_next_position(),
+				direction = bp_entity.direction,
+				control_behavior = bp_entity.control_behavior,
+			}
+			result_entities[combinator_index] = param
+			bp_to_compiled[bp_index] = combinator_index
+		elseif entity_name == constants.pad_name then
+			-- Create and map pad connector.
+			local tags = bp_entity.tags
+			local pin_number = tags and tags.pin --[[@as uint?]]
+			if pin_number then
+				local connector_index = #result_entities + 1
+				result_entities[connector_index] = {
+					name = PAD_CONNECTOR_NAME,
+					position = get_next_position(),
+					direction = bp_entity.direction,
+				}
+				bp_to_compiled[bp_index] = connector_index
+
+				add_pad_mapping(result.pad_map, pin_number, connector_index)
+				if tags and tags.label then
+					result.labels[pin_number] = tostring(tags.label)
+				end
+			end
+		elseif entity_name == constants.pin_name then
+			-- Store pin in lookup table for later resolution.
+			local ic_index, pin_number = get_pin_info_from_tags(bp_entity.tags)
+			if ic_index and pin_number then
+				local bp_ic = bp_ics[ic_index]
+				if not bp_ic then
+					bp_ic = {}
+					bp_ics[ic_index] = bp_ic
+				end
+				bp_ic[pin_number] = bp_index
+				bp_pins[bp_index] = { ic_index, pin_number }
+			end
+		elseif entity_name == constants.ic_name then
+			if not bp_ics[bp_index] then bp_ics[bp_index] = {} end
+		end
+	end
+
+	-- PASS 2: RECURSION PASS
+	---Map from BP pin indices within this IC to the created pad entities of the recursive IC.
+	---@type {[uint]: uint[]}
+	local pin_remap = {}
+	for bp_index, pin_map in pairs(bp_ics) do
+		-- Compile embbeded IC.
+		local bp_entity = bp_entities[bp_index]
+		local ic_blueprint_string =
+			get_ic_blueprint_string_from_tags(bp_entity.tags)
+		if not ic_blueprint_string then goto continue end
+		local compiled = compile(ic_blueprint_string, level + 1)
+		if not compiled then goto continue end
+
+		local index_offset = #result_entities
+
+		-- Transfer recursive entities
+		for _, entity in ipairs(compiled.entities) do
+			result_entities[#result_entities + 1] = entity
+		end
+
+		-- Transfer wires, compensate for index offset.
+		for _, wire in pairs(compiled.wires) do
+			wire[1] = wire[1] + index_offset
+			wire[3] = wire[3] + index_offset
+			result.wires[#result.wires + 1] = wire
+		end
+
+		-- Compute pin-to-pad mapping for the embedded IC
+		for pin_number, bp_pin_index in pairs(pin_map) do
+			local compiled_pads = compiled.pad_map[pin_number]
+			if compiled_pads then
+				pin_remap[bp_pin_index] = tlib.map(
+					compiled_pads,
+					function(connector_index) return connector_index + index_offset end
+				)
+			end
+		end
+		::continue::
+	end
+
+	-- PASS 3: WIRING PASS
+	local wires_dedupe = {}
+
+	---@return uint? single Single target entity within `entities`
+	---@return uint[]? multi Multiple target `entities` (in case of pin remapping due to recursion)
+	local function resolve_wire(bp_index)
+		if not bp_index then return nil end
+		local direct = bp_to_compiled[bp_index]
+		if direct then return direct end
+
+		local multi = pin_remap[bp_index]
+		if multi then return nil, multi end
+	end
+
+	for _, bp_entity in pairs(bp_entities) do
+		local wires = bp_entity.wires
+		if not wires then goto continue_entities end
+		for _, wire in pairs(wires) do
+			local a_num = wire[1]
+			local a_connector = wire[2]
+			local b_num = wire[3]
+			local b_connector = wire[4]
+
+			local a_direct, a_multi = resolve_wire(a_num)
+			local b_direct, b_multi = resolve_wire(b_num)
+			if not a_direct and not a_multi then goto continue_wires end
+			if not b_direct and not b_multi then goto continue_wires end
+
+			-- Easy case
+			if a_direct and b_direct then
+				add_wire(
+					result.wires,
+					wires_dedupe,
+					a_direct,
+					a_connector,
+					b_direct,
+					b_connector
+				)
+				goto continue_wires
+			end
+
+			-- Crossproduct case
+			a_multi = a_multi or { a_direct }
+			b_multi = b_multi or { b_direct }
+			for _, a_endpoint in pairs(a_multi) do
+				for _, b_endpoint in pairs(b_multi) do
+					add_wire(
+						result.wires,
+						wires_dedupe,
+						a_endpoint,
+						a_connector,
+						b_endpoint,
+						b_connector
+					)
+				end
+			end
+
+			::continue_wires::
+		end
+
+		::continue_entities::
+	end
+
+	return result
+end
+
+lib.compile = compile
+
+return lib

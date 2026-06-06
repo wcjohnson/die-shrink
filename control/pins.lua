@@ -171,12 +171,15 @@ local function create_pin_entity(parent_entity, pos)
 	})
 end
 
-local function create_pin_thing(parent, child_entity, index, offset)
+local function create_pin_thing(parent, child_entity, index, num, offset)
 	remote.call("things", "create_thing", {
 		entity = child_entity,
 		parent = parent.id,
 		child_index = index,
 		relative_pos = offset,
+		tags = {
+			n = num,
+		},
 	})
 end
 
@@ -214,7 +217,7 @@ local function check_pins(parent, n_pins, ic)
 				offset_pos(parent_pos, parent.virtual_orientation, pin_offset)
 			local child_entity = create_pin_entity(parent.entity, child_pos)
 			if child_entity then
-				create_pin_thing(parent, child_entity, pin_index, pin_offset)
+				create_pin_thing(parent, child_entity, pin_index, i, pin_offset)
 				strace.trace("created pin", pin_index, "of cpu", parent.id)
 				did_work = true
 			else
