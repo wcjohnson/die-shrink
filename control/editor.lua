@@ -38,6 +38,7 @@ local ALLOWED_ENTITY_NAMES = {
 	["arithmetic-combinator"] = true,
 	["decider-combinator"] = true,
 	["selector-combinator"] = true,
+	["display-panel"] = true,
 	[constants.pad_name] = true,
 	[constants.ic_name] = true,
 	[constants.pin_name] = true,
@@ -184,7 +185,10 @@ local function handle_built_ghost(entity, player)
 		strace.trace("revived ghost into", revived, "with tags", ghost_tags)
 		if revived and ghost_name == constants.pad_name then
 			local session = get_editor_session_by_surface(revived.surface)
-			apply_pad_tags(session, revived, ghost_tags)
+			if session then
+				apply_pad_tags(session, revived, ghost_tags)
+				session:create_label(revived, "pad")
+			end
 		end
 		return
 	end
@@ -491,10 +495,12 @@ local function save_editor_session(session_id)
 	end
 end
 
-scheduler.register_handler(
-	"load_session",
-	function(task) restore_editor_blueprint(table.unpack(task.data, 2)) end
-)
+scheduler.register_handler("load_session", function(task)
+	-- Paste blueprint into editor
+	restore_editor_blueprint(table.unpack(task.data, 2))
+	-- Restore pin labels
+	task.data[1]:create_all_labels()
+end)
 
 ---@param player LuaPlayer
 ---@param ic DieShrink.IC
@@ -630,12 +636,18 @@ event.bind(
 ---@field i? boolean
 ---@field o? boolean
 
+---@class (partial) DieShrink.LabeledEntityInfo
+---@field unit_number UnitNumber
+---@field entity LuaEntity
+---@field type string "pad"
+
 ---@class DieShrink.EditorSession
 ---@field id ID Session identifier.
 ---@field player LuaPlayer The player owning this editor session.
 ---@field ic DieShrink.IC The IC being edited in this session.
 ---@field surface LuaSurface The editor surface for this session.
 ---@field pads {[UnitNumber]: DieShrink.EditorPadInfo} The pads currently in this editor session.
+---@field labels {[UnitNumber]: DieShrink.LabeledEntityInfo} The entities with labels in this editor session.
 local EditorSession = class("DieShrink.EditorSession")
 _G.EditorSession = EditorSession
 
@@ -650,10 +662,80 @@ function EditorSession:new(player, ic, surface)
 		ic = ic,
 		surface = surface,
 		pads = {},
+		labels = {},
 	}, self)
 	storage.editor_sessions = storage.editor_sessions or {}
 	storage.editor_sessions[session.id] = session
 	return session
+end
+
+---@param entity LuaEntity
+---@param type "pad" Currently only supports pads, but could be extended to other entity types with labels in the future.
+function EditorSession:create_label(entity, type)
+	if not entity or not entity.valid then return end
+	if self.labels[entity.unit_number] then return end
+	local label_info = {
+		unit_number = entity.unit_number,
+		entity = entity,
+		type = type,
+	}
+	self.labels[entity.unit_number] = label_info
+	self:update_label(label_info)
+	return label_info
+end
+
+function EditorSession:destroy_label(label)
+	if not label or not label.entity or not label.entity.valid then return end
+	local ro = label.ro
+	if ro and ro.valid then ro.destroy() end
+	self.labels[label.unit_number] = nil
+end
+
+function EditorSession:update_label(label_or_unit_number)
+	local label = type(label_or_unit_number) == "number"
+			and self.labels[label_or_unit_number]
+		or label_or_unit_number
+	if type(label) ~= "table" then return end
+
+	local entity = label.entity
+	if not entity or not entity.valid then
+		self:destroy_label(label)
+		return
+	end
+
+	local info = self.pads[label.unit_number] or EMPTY
+	local label_text = info.pin and tostring(info.pin) or "[color=red]!![/color]"
+	if info.label then
+		label_text = label_text .. ":  " .. tostring(info.label)
+	end
+
+	local ro = label.ro
+		or rendering.draw_text({
+			text = "",
+			surface = self.surface,
+			target = { entity = label.entity, offset = { 0, -0.8 } },
+			color = { r = 1, g = 1, b = 0 },
+			alignment = "center",
+			use_rich_text = true,
+		})
+	label.ro = ro
+	ro.text = label_text
+end
+
+---When restoring a blueprint, we must create all possible labels
+function EditorSession:create_all_labels()
+	local pads = self.surface.find_entities_filtered({
+		name = constants.pad_name,
+	})
+	for _, pad in pairs(pads) do
+		self:create_label(pad, "pad")
+	end
+end
+
+function EditorSession:destroy_labels()
+	for _, label in pairs(self.labels) do
+		self:destroy_label(label)
+	end
 end
 
 ---@param unit_number UnitNumber
@@ -704,8 +786,18 @@ function EditorSession:set_pad_o(unit_number, is_out)
 end
 
 function EditorSession:destroy()
+	self:destroy_labels()
 	if storage.editor_sessions then storage.editor_sessions[self.id] = nil end
 end
+
+event.bind(
+	"dieshrink.editor_session_pad_changed",
+	function(sess, un) sess:update_label(un) end
+)
+
+--------------------------------------------------------------------------------
+-- Api
+--------------------------------------------------------------------------------
 
 ---@param player_index PlayerIndex
 ---@param ic DieShrink.IC
