@@ -775,6 +775,10 @@ function EditorSession:set_pad_label(unit_number, label)
 	event.raise("dieshrink.editor_session_pad_changed", self, unit_number)
 end
 
+function EditorSession:get_pad_label(unit_number)
+	return self:get_pad_info(unit_number).label
+end
+
 function EditorSession:set_pad_i(unit_number, is_in)
 	self:get_or_create_pad_info(unit_number).i = is_in
 	event.raise("dieshrink.editor_session_pad_changed", self, unit_number)

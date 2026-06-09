@@ -21,10 +21,18 @@ lib.PadUi = relm.define("PadUi", function(props)
 	local session = props.session --[[@as DieShrink.EditorSession]]
 	local ic = props.ic --[[@as DieShrink.IC]]
 	local pad_unit_number = props.pad_unit_number
+
+	-- Pin info
 	local current_pin = session:get_pad_pin(pad_unit_number)
 	local pin_opts = {}
 	for i = 1, ic:get_n_pins() do
 		pin_opts[i] = { key = i, caption = tostring(i) }
+	end
+
+	-- Label
+	local label_value = session:get_pad_label(pad_unit_number) or ""
+	local set_label = function(_, new_label)
+		session:set_pad_label(pad_unit_number, new_label)
 	end
 
 	-- Window management
@@ -53,12 +61,21 @@ lib.PadUi = relm.define("PadUi", function(props)
 	return ultros.WindowFrame({
 		caption = "Pad",
 		on_close = close_me,
+		width = 300,
 	}, {
-		HF({ width = 300 }, {
+		ultros.Labeled({ caption = "Pin number" }, {
 			ultros.Dropdown({
 				options = pin_opts,
 				value = current_pin,
 				on_change = function(_, pin) session:set_pad_pin(pad_unit_number, pin) end,
+			}),
+		}),
+		ultros.Labeled({ caption = "Pin label" }, {
+			ultros.UncontrolledInput({
+				value = label_value,
+				width = 200,
+				on_change = set_label,
+				icon_selector = true,
 			}),
 		}),
 	})
