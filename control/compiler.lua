@@ -93,6 +93,19 @@ local function add_pad_mapping(pad_map, pad_number, connector_index)
 	mapped[#mapped + 1] = connector_index
 end
 
+---@param labels {[uint]: string}
+---@param pin_number uint?
+---@param label string?
+local function add_pin_label(labels, pin_number, label)
+	if not pin_number or not label or label == "" then return end
+	local existing = labels[pin_number]
+	if not existing or existing == "" then
+		labels[pin_number] = label
+	else
+		labels[pin_number] = existing .. " / " .. label
+	end
+end
+
 ---Compile a circuit from its editor blueprint.
 ---@param bp_entities string|BlueprintEntity[]
 ---@param recursion_level? uint
@@ -176,11 +189,11 @@ local function compile(bp_entities, recursion_level)
 				control_behavior = bp_entity.control_behavior,
 			}
 			strace.trace(
-				"Index",
+				"Compiled index",
 				combinator_index,
-				"is",
+				"is a",
 				combinator_name,
-				"bp_index",
+				"coming from bp_index",
 				bp_index
 			)
 			result_entities[combinator_index] = param
@@ -206,9 +219,11 @@ local function compile(bp_entities, recursion_level)
 					"bp_index",
 					bp_index
 				)
-				if tags and tags.label then
-					result.labels[pin_number] = tostring(tags.label)
-				end
+				add_pin_label(
+					result.labels,
+					pin_number,
+					tags and tags.label and tostring(tags.label) or nil
+				)
 			end
 		elseif entity_name == constants.pin_name then
 			-- Store pin in lookup table for later resolution.

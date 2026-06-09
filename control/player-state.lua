@@ -184,8 +184,9 @@ function PlayerState:render_pin_labels(parent, children)
 	end
 	if not children then return end
 	local labels = BASE_LABELS
-	if parent.tags and parent.tags.labels then
-		labels = parent.tags.labels --[[@as table]]
+	local ic = get_ic_state(parent.id)
+	if ic and ic.pin_labels and next(ic.pin_labels) then
+		labels = ic.pin_labels
 	end
 
 	self:clear_pin_labels()
@@ -206,7 +207,7 @@ function PlayerState:render_pin_labels(parent, children)
 				surface = entity.surface,
 				target = { entity = entity, offset = offsets[dir] or { 0, 0 } },
 				orientation = orientations[dir] or 0,
-				color = { r = 1, g = 1, b = 0 },
+				color = { r = 1, g = 1, b = 1 },
 				alignment = aligns[dir] or "center",
 				players = { self.player_index },
 				use_rich_text = true,

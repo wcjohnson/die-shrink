@@ -13,13 +13,16 @@ local tlib = require("lib.core.table")
 ---@field thing_id ThingID
 ---@field alive boolean
 ---@field n_pins uint
+---@field pin_labels {[uint]: string} Labels for pins, indexed by pin number
 ---@field linked? DieShrink.LinkerResult Linker result for this IC.
 local IC = class("DieShrink.IC")
 _G.IC = IC
 
 function IC:new(thing_id)
-	local obj =
-		setmetatable({ thing_id = thing_id, n_pins = 0, alive = false }, self)
+	local obj = setmetatable(
+		{ thing_id = thing_id, n_pins = 0, alive = false, pin_labels = {} },
+		self
+	)
 	local ics = storage.ics
 	if not ics then
 		ics = {}
@@ -79,6 +82,7 @@ function IC:link(force_recompile)
 		strace.error("Failed to compile IC with thing_id", self.thing_id)
 		return
 	end
+	self.pin_labels = compiled.labels or {}
 	strace.trace(
 		"Compiled IC",
 		self.thing_id,
