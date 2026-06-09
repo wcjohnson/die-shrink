@@ -75,12 +75,14 @@ lib.IcUi = relm.define("IcUi", function(props)
 				}),
 			})
 		end),
-		HF({ width = 300 }, {
-			ultros.Button({
-				caption = "Open Editor",
-				on_click = function() open_editor_session(player_index, ic) end,
-			}),
-		}),
+		ultros.CallIf(n_pins > 0, function()
+			return HF({ width = 300 }, {
+				ultros.Button({
+					caption = "Open Editor",
+					on_click = function() open_editor_session(player_index, ic) end,
+				}),
+			})
+		end),
 	})
 end)
 
