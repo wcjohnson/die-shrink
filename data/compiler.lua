@@ -56,7 +56,7 @@ local base_prototype = {
 	created_smoke = nil,
 
 	-- CombinatorPrototype
-	active_energy_usage = "1kW",
+	active_energy_usage = "1W",
 	energy_source = energy_source,
 	circuit_wire_max_distance = 64,
 	draw_circuit_wires = false,

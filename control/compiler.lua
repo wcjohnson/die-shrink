@@ -24,6 +24,8 @@ local COMBINATOR_ENTITY_MAP = {
 
 local PAD_CONNECTOR_NAME = constants.mod_prefix .. "-pad-connector"
 
+local POWER_CONSUMER_NAME = constants.mod_prefix .. "-power-consumer"
+
 ---Given the blueprint tags of a pin, return the blueprint entity index of
 ---the parent processor within the pin's blueprint.
 ---@param pin_tags Tags The tags of a pin entity within a blueprint.
@@ -109,8 +111,9 @@ end
 ---Compile a circuit from its editor blueprint.
 ---@param bp_entities string|BlueprintEntity[]
 ---@param recursion_level? uint
+---@param get_next_position? fun(): MapPosition
 ---@return DieShrink.CompilerResult? result The compiled circuit, or nil if compilation failed.
-local function compile(bp_entities, recursion_level)
+local function compile(bp_entities, recursion_level, get_next_position)
 	local result = create_empty_result()
 
 	-- Compile string if needed
@@ -132,9 +135,7 @@ local function compile(bp_entities, recursion_level)
 
 	strace.trace("Compiling from", #bp_entities, "blueprint entities")
 	local level = recursion_level or 0
-	local do_layout_positions = level == 0
-	local get_next_position
-	do
+	if not get_next_position then
 		local min_x = -0.45
 		local min_y = -0.45
 		local max_x = 0.45
@@ -148,7 +149,6 @@ local function compile(bp_entities, recursion_level)
 		local iy = 0
 
 		get_next_position = function()
-			if not do_layout_positions then return { 0, 0 } end
 			local pos = {
 				min_x + ix * step,
 				min_y + iy * step,
@@ -174,6 +174,12 @@ local function compile(bp_entities, recursion_level)
 	---Pins (bp index of pin) -> [bp index of IC, pin number]
 	---@type {[uint]: [uint, uint]}
 	local bp_pins = {}
+
+	-- Create the power-consuming entity for the compiled circuit
+	result_entities[#result_entities + 1] = {
+		name = POWER_CONSUMER_NAME,
+		position = { 0, 0 },
+	}
 
 	-- PASS 1: CLASSIFICATION
 	for bp_index, bp_entity in pairs(bp_entities) do
@@ -252,7 +258,7 @@ local function compile(bp_entities, recursion_level)
 		local ic_blueprint_string =
 			get_ic_blueprint_string_from_tags(bp_entity.tags)
 		if not ic_blueprint_string then goto continue end
-		local compiled = compile(ic_blueprint_string, level + 1)
+		local compiled = compile(ic_blueprint_string, level + 1, get_next_position)
 		if not compiled then goto continue end
 
 		local index_offset = #result_entities

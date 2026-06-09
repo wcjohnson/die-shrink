@@ -1,5 +1,9 @@
 local constants = require("lib.constants")
 
+--------------------------------------------------------------------------------
+-- IC
+--------------------------------------------------------------------------------
+
 local entity_sprite = {}
 for idx, direction in pairs({ "north", "east", "south", "west" }) do
 	---@type data.Sprite
@@ -66,3 +70,54 @@ local item = {
 }
 
 data:extend({ ic, item })
+
+--------------------------------------------------------------------------------
+-- POWER CONSUMER
+--------------------------------------------------------------------------------
+
+---@type data.Sprite
+local invisible_sprite = {
+	filename = __GRAPHICS_PATH__ .. "invisible.png",
+	width = 1,
+	height = 1,
+}
+
+---@type data.LampPrototype
+local power_consumer = {
+	-- PrototypeBase
+	name = constants.mod_prefix .. "-power-consumer",
+	type = "lamp",
+	hidden_in_factoriopedia = true,
+
+	-- EntityPrototype
+	minable = nil,
+	collision_box = { { -0.01, -0.01 }, { 0.01, 0.01 } },
+	selection_box = { { -0.01, -0.01 }, { 0.01, 0.01 } },
+	max_health = 1000,
+	collision_mask = { layers = {} },
+	flags = {
+		"hide-alt-info",
+		"not-on-map",
+		"not-upgradable",
+		"not-blueprintable",
+		"not-deconstructable",
+		"placeable-off-grid",
+	},
+	selection_priority = 10,
+	selectable_in_game = false,
+	allow_copy_paste = false,
+	created_smoke = nil,
+
+	-- LampPrototype
+	picture_on = { layers = { invisible_sprite } },
+	picture_off = { layers = { invisible_sprite } },
+	always_on = true,
+
+	energy_usage_per_tick = "5kW",
+	energy_source = { type = "electric", usage_priority = "secondary-input" },
+	circuit_wire_connection_point = nil,
+	draw_copper_wires = false,
+	draw_circuit_wires = false,
+}
+
+data:extend({ power_consumer })
