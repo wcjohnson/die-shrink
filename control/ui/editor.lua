@@ -11,6 +11,7 @@ local cursor_lib = require("lib.core.cursor")
 
 local HF = ultros.HFlow
 local pad_sprite_name = "item/" .. constants.pad_name
+local option_sprite_name = "item/" .. constants.option_name
 
 local lib = {}
 
@@ -70,6 +71,13 @@ lib.EditorUi = relm.define("EditorUi", function(props)
 				tooltip = { "die-shrink-editor.pick-pad" },
 				on_click = function()
 					cursor_lib.set_cursor_ghost(player, constants.pad_name)
+				end,
+			}),
+			ultros.SpriteButton({
+				sprite = option_sprite_name,
+				tooltip = { "die-shrink-editor.pick-option" },
+				on_click = function()
+					cursor_lib.set_cursor_ghost(player, constants.option_name)
 				end,
 			}),
 		}),

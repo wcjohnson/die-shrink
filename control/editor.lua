@@ -42,6 +42,7 @@ local ALLOWED_ENTITY_NAMES = {
 	[constants.pad_name] = true,
 	[constants.ic_name] = true,
 	[constants.pin_name] = true,
+	[constants.option_name] = true,
 }
 
 local EDITOR_SYSTEM_ENTITY_NAMES = {

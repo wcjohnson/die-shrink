@@ -2,7 +2,9 @@ local constants = require("lib.constants")
 local tlib = require("lib.core.table")
 local data_util = require("lib.core.data-util")
 
+--------------------------------------------------------------------------------
 -- Internal radar to keep editor surfaces charted.
+--------------------------------------------------------------------------------
 ---@type data.RadarPrototype
 local radar = {
 	type = "radar",
@@ -36,7 +38,9 @@ local radar = {
 }
 data:extend({ radar })
 
+--------------------------------------------------------------------------------
 -- Internal energy source to power combinators on editor surfaces.
+--------------------------------------------------------------------------------
 ---@type data.ElectricEnergyInterfacePrototype
 local energy_source = {
 	type = "electric-energy-interface",
@@ -87,7 +91,9 @@ local pad_pictures = {
 	},
 }
 
+--------------------------------------------------------------------------------
 -- Buildable internal pad to bond to external pins
+--------------------------------------------------------------------------------
 ---@type data.ElectricPolePrototype
 local pad = {
 	-- PrototypeBase
@@ -152,3 +158,51 @@ local pad_item = {
 }
 
 data:extend({ pad, pad_item })
+
+--------------------------------------------------------------------------------
+-- Internal constant combinator for defining options input.
+--------------------------------------------------------------------------------
+---@type data.ConstantCombinatorPrototype
+local option =
+	table.deepcopy(data.raw["constant-combinator"]["constant-combinator"])
+option.name = constants.option_name
+option.hidden_in_factoriopedia = true
+option.icon = __GRAPHICS_PATH__ .. "/option-combinator-icon.png"
+option.minable = { mining_time = 1 }
+option.flags = {
+	"not-on-map",
+	"hide-alt-info",
+	"not-upgradable",
+	"no-automated-item-removal",
+	"no-automated-item-insertion",
+	"not-in-kill-statistics",
+	"placeable-player",
+	"player-creation",
+}
+option.created_smoke = nil
+
+local hr_sprite = __GRAPHICS_PATH__ .. "option-combinator.png"
+option.sprites.east.layers[1].filename = hr_sprite
+option.sprites.west.layers[1].filename = hr_sprite
+option.sprites.north.layers[1].filename = hr_sprite
+option.sprites.south.layers[1].filename = hr_sprite
+
+-- Needed for pads to be blueprintable.
+---@type data.ItemPrototype
+local option_item = {
+	-- PrototypeBase
+	type = "item",
+	name = constants.option_name,
+	order = "f[iber-optics]",
+	subgroup = "circuit-network",
+	hidden_in_factoriopedia = true,
+
+	-- ItemPrototype
+	stack_size = 50,
+	icon = __GRAPHICS_PATH__ .. "/option-combinator-icon.png",
+	place_result = constants.option_name,
+	flags = { "hide-from-bonus-gui", "only-in-cursor" },
+	weight = 0,
+}
+
+data:extend({ option, option_item })
