@@ -53,6 +53,7 @@ local EDITOR_SYSTEM_ENTITY_NAMES = {
 local EDITOR_TAGGED_ENTITY_NAMES = {
 	[constants.pad_name] = true,
 	[constants.ic_name] = true,
+	[constants.option_name] = true,
 }
 
 --------------------------------------------------------------------------------
@@ -71,13 +72,31 @@ local function shallow_copy_tags(tags)
 	return copy
 end
 
+---@return {[ID]: DieShrink.EditorSession}
+local function get_editor_sessions()
+	if not storage.editor_sessions then storage.editor_sessions = {} end
+	return storage.editor_sessions
+end
+
+---@return {[uint]: ID}
+local function get_surface_to_session()
+	if not storage.surface_to_session then storage.surface_to_session = {} end
+	return storage.surface_to_session
+end
+
+---@param surface LuaSurface?
+---@return boolean
+local function is_editor_surface(surface)
+	if not surface or not surface.valid then return false end
+	local surface_to_session = storage.surface_to_session
+	return surface_to_session and surface_to_session[surface.index] ~= nil
+		or false
+end
+
 ---@param surface LuaSurface?
 ---@return DieShrink.EditorSession?
 local function get_editor_session_by_surface(surface)
-	if not surface or not surface.valid then
-		strace.warn("get_editor_session_by_surface: invalid surface", surface)
-		return nil
-	end
+	if not surface or not surface.valid then return nil end
 	local owner_session_id = storage.surface_to_session
 		and storage.surface_to_session[surface.index]
 	return owner_session_id
@@ -105,18 +124,10 @@ local function get_pad_info_from_tags(tags)
 	}
 end
 
----@param session DieShrink.EditorSession?
----@param pad LuaEntity?
+---@param session DieShrink.EditorSession
+---@param pad LuaEntity
 ---@param tags Tags?
 local function apply_pad_tags(session, pad, tags)
-	if
-		not session
-		or not pad
-		or not pad.valid
-		or pad.name ~= constants.pad_name
-	then
-		return
-	end
 	local initial_info = get_pad_info_from_tags(tags)
 	strace.trace(
 		"apply_pad_tags",
@@ -130,25 +141,21 @@ local function apply_pad_tags(session, pad, tags)
 	session:set_pad_info(pad.unit_number, initial_info)
 end
 
----@return {[ID]: DieShrink.EditorSession}
-local function get_editor_sessions()
-	if not storage.editor_sessions then storage.editor_sessions = {} end
-	return storage.editor_sessions
-end
-
----@return {[uint]: ID}
-local function get_surface_to_session()
-	if not storage.surface_to_session then storage.surface_to_session = {} end
-	return storage.surface_to_session
-end
-
----@param surface LuaSurface?
----@return boolean
-local function is_editor_surface(surface)
-	if not surface or not surface.valid then return false end
-	local surface_to_session = storage.surface_to_session
-	return surface_to_session and surface_to_session[surface.index] ~= nil
-		or false
+---@param session DieShrink.EditorSession
+---@param entity LuaEntity
+---@param tags Tags?
+local function apply_option_tags(session, entity, tags)
+	local initial_info = tags
+	strace.trace(
+		"apply_option_tags",
+		session,
+		entity,
+		entity.unit_number,
+		tags,
+		initial_info
+	)
+	if not initial_info then return end
+	session:set_option_definition(entity.unit_number, initial_info)
 end
 
 ---@param entity_name string
@@ -183,12 +190,17 @@ local function handle_built_ghost(entity, player)
 	if ghost_name and ALLOWED_ENTITY_NAMES[ghost_name] then
 		local ghost_tags = entity.tags
 		local _, revived = entity.silent_revive({ raise_revive = true })
-		strace.trace("revived ghost into", revived, "with tags", ghost_tags)
-		if revived and ghost_name == constants.pad_name then
-			local session = get_editor_session_by_surface(revived.surface)
-			if session then
-				apply_pad_tags(session, revived, ghost_tags)
-				session:create_label(revived, "pad")
+		if revived then
+			strace.trace("revived ghost into", revived, "with tags", ghost_tags)
+			if ghost_name == constants.pad_name then
+				local session = get_editor_session_by_surface(revived.surface)
+				if session then
+					apply_pad_tags(session, revived, ghost_tags)
+					session:create_label(revived, "pad")
+				end
+			elseif ghost_name == constants.option_name then
+				local session = get_editor_session_by_surface(revived.surface)
+				if session then apply_option_tags(session, revived, ghost_tags) end
 			end
 		end
 		return
@@ -333,6 +345,16 @@ local function capture_editor_blueprint(session, surface, force)
 							i = pad_info.i,
 							o = pad_info.o,
 						})
+					end
+				elseif entity.name == constants.option_name then
+					local option_def = session.options[entity.unit_number]
+					if option_def then
+						strace.trace(
+							"Capture: tagging option",
+							entity.unit_number,
+							option_def
+						)
+						bp.set_blueprint_entity_tags(index, option_def)
 					end
 				end
 			end
@@ -589,17 +611,11 @@ end)
 ---@param tags Tags?
 ---@param player_index uint?
 local function handle_editor_surface_build(entity, tags, player_index)
-	if
-		not entity
-		or not entity.valid
-		or not is_editor_surface(entity.surface)
-	then
-		return
-	end
+	local session = get_editor_session_by_surface(entity.surface)
+	if not session then return end
 
 	strace.trace("editor_surface_build", player_index, entity, tags)
 	if tags and EDITOR_TAGGED_ENTITY_NAMES[entity.name] then
-		local session = get_editor_session_by_surface(entity.surface)
 		if entity.name == constants.pad_name then
 			apply_pad_tags(session, entity, tags)
 		end
@@ -648,6 +664,7 @@ event.bind(
 ---@field ic DieShrink.IC The IC being edited in this session.
 ---@field surface LuaSurface The editor surface for this session.
 ---@field pads {[UnitNumber]: DieShrink.EditorPadInfo} The pads currently in this editor session.
+---@field options {[UnitNumber]: DieShrink.OptionDefinition} The options currently in this editor session.
 ---@field labels {[UnitNumber]: DieShrink.LabeledEntityInfo} The entities with labels in this editor session.
 local EditorSession = class("DieShrink.EditorSession")
 _G.EditorSession = EditorSession
@@ -663,6 +680,7 @@ function EditorSession:new(player, ic, surface)
 		ic = ic,
 		surface = surface,
 		pads = {},
+		options = {},
 		labels = {},
 	}, self)
 	storage.editor_sessions = storage.editor_sessions or {}
@@ -780,14 +798,18 @@ function EditorSession:get_pad_label(unit_number)
 	return self:get_pad_info(unit_number).label
 end
 
-function EditorSession:set_pad_i(unit_number, is_in)
-	self:get_or_create_pad_info(unit_number).i = is_in
-	event.raise("dieshrink.editor_session_pad_changed", self, unit_number)
+function EditorSession:set_option_definition(unit_number, definition)
+	self.options[unit_number] = definition
+	event.raise(
+		"dieshrink.editor_session_option_changed",
+		self,
+		unit_number,
+		definition
+	)
 end
 
-function EditorSession:set_pad_o(unit_number, is_out)
-	self:get_or_create_pad_info(unit_number).o = is_out
-	event.raise("dieshrink.editor_session_pad_changed", self, unit_number)
+function EditorSession:get_option_definition(unit_number)
+	return self.options[unit_number]
 end
 
 function EditorSession:destroy()

@@ -46,6 +46,7 @@ require("control.pins")
 require("control.ui.ic")
 require("control.ui.editor")
 require("control.ui.pad")
+require("control.ui.option")
 
 -- Enable support for the Global Variable Viewer debugging mod, if it is
 -- installed.
