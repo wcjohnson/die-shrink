@@ -177,7 +177,8 @@ end
 
 ---@param entity LuaEntity
 ---@param player LuaPlayer?
-local function handle_built_ghost(entity, player)
+---@param session DieShrink.EditorSession
+local function handle_built_ghost(entity, player, session)
 	if not entity.valid or entity.name ~= "entity-ghost" then return end
 	local ghost_unit_number = entity.unit_number
 	local ghost_name = entity.ghost_name
@@ -193,14 +194,10 @@ local function handle_built_ghost(entity, player)
 		if revived then
 			strace.trace("revived ghost into", revived, "with tags", ghost_tags)
 			if ghost_name == constants.pad_name then
-				local session = get_editor_session_by_surface(revived.surface)
-				if session then
-					apply_pad_tags(session, revived, ghost_tags)
-					session:create_label(revived, "pad")
-				end
+				apply_pad_tags(session, revived, ghost_tags)
+				session:create_label(revived, "pad")
 			elseif ghost_name == constants.option_name then
-				local session = get_editor_session_by_surface(revived.surface)
-				if session then apply_option_tags(session, revived, ghost_tags) end
+				apply_option_tags(session, revived, ghost_tags)
 			end
 		end
 		return
@@ -434,10 +431,11 @@ local function get_recentered_build_position(bp_entities)
 	}
 end
 
+---@param session DieShrink.EditorSession
 ---@param surface LuaSurface
 ---@param force LuaForce
 ---@param blueprint string
-local function restore_editor_blueprint(surface, force, blueprint)
+local function restore_editor_blueprint(session, surface, force, blueprint)
 	strace.trace("--- RESTORE_EDITOR_BLUEPRINT")
 	strace.trace(
 		"Restoring blueprint",
@@ -477,7 +475,9 @@ local function restore_editor_blueprint(surface, force, blueprint)
 		strace.trace("Built entities", built)
 
 		for _, entity in pairs(built) do
-			if entity.name == "entity-ghost" then handle_built_ghost(entity, nil) end
+			if entity.name == "entity-ghost" then
+				handle_built_ghost(entity, nil, session)
+			end
 		end
 	end
 	inv.destroy()
@@ -520,7 +520,7 @@ end
 
 scheduler.register_handler("load_session", function(task)
 	-- Paste blueprint into editor
-	restore_editor_blueprint(table.unpack(task.data, 2))
+	restore_editor_blueprint(table.unpack(task.data))
 	-- Restore pin labels
 	task.data[1]:create_all_labels()
 end)
@@ -618,13 +618,15 @@ local function handle_editor_surface_build(entity, tags, player_index)
 	if tags and EDITOR_TAGGED_ENTITY_NAMES[entity.name] then
 		if entity.name == constants.pad_name then
 			apply_pad_tags(session, entity, tags)
+		elseif entity.name == constants.option_name then
+			apply_option_tags(session, entity, tags)
 		end
 	end
 
 	if entity.name ~= "entity-ghost" then return end
 
 	local player = player_index and game.get_player(player_index) or nil
-	handle_built_ghost(entity, player)
+	handle_built_ghost(entity, player, session)
 end
 
 event.bind(

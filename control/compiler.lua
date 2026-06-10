@@ -12,6 +12,7 @@ local type = type
 local min = math.min
 local max = math.max
 local tconcat = table.concat
+local sformat = string.format
 
 local lib = {}
 
@@ -51,6 +52,7 @@ end
 ---@field wires [uint,defines.wire_connector_id,uint,defines.wire_connector_id][] List of wires between entities that should be restored when building.
 ---@field labels {[uint]: string} Mapping of pin index to label text
 ---@field pad_map {[uint]: uint[]} Mapping of external IC pin number to corresponding pad connector indices within `entities`.
+---@field options {string: [DieShrink.OptionDefinition, uint]} List of option definitions available inside the IC along with pointers to the constant combinators representing them in `entities`.
 
 ---@return DieShrink.CompilerResult
 local function create_empty_result()
@@ -59,7 +61,16 @@ local function create_empty_result()
 		wires = {},
 		labels = {},
 		pad_map = {},
+		options = {},
 	}
+end
+
+---@param pos MapPosition
+---@return string
+local function get_option_key(pos)
+	local x = pos.x or pos[1] or 0
+	local y = pos.y or pos[2] or 0
+	return sformat("%.3f,%.3f", x, y)
 end
 
 ---@param wires [uint, uint][]
@@ -230,6 +241,22 @@ local function compile(bp_entities, recursion_level, get_next_position)
 					pin_number,
 					tags and tags.label and tostring(tags.label) or nil
 				)
+			end
+		elseif entity_name == constants.option_name then
+			local option_def = bp_entity.tags
+			if option_def and option_def.type then
+				local combinator_index = #result_entities + 1
+				local position = get_next_position()
+				local param = {
+					name = COMBINATOR_ENTITY_MAP["constant-combinator"],
+					position = position,
+					direction = bp_entity.direction,
+				}
+				result_entities[combinator_index] = param
+
+				local option_key = get_option_key(position)
+				option_def.key = option_key
+				result.options[option_key] = { option_def, combinator_index }
 			end
 		elseif entity_name == constants.pin_name then
 			-- Store pin in lookup table for later resolution.
