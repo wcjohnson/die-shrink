@@ -5,6 +5,7 @@ local data_util = require("lib.core.data-util")
 --------------------------------------------------------------------------------
 -- Internal radar to keep editor surfaces charted.
 --------------------------------------------------------------------------------
+
 ---@type data.RadarPrototype
 local radar = {
 	type = "radar",
@@ -41,6 +42,7 @@ data:extend({ radar })
 --------------------------------------------------------------------------------
 -- Internal energy source to power combinators on editor surfaces.
 --------------------------------------------------------------------------------
+
 ---@type data.ElectricEnergyInterfacePrototype
 local energy_source = {
 	type = "electric-energy-interface",
@@ -73,27 +75,33 @@ local energy_source = {
 }
 data:extend({ energy_source })
 
+--------------------------------------------------------------------------------
+-- Buildable internal pad to bond to external pins
+--------------------------------------------------------------------------------
+
 ---@type data.WireConnectionPoint
 local ZERO_CONNECTION_POINT = {
 	wire = { green = { 0, 0 }, red = { 0, 0 } },
 	shadow = { green = { 0, 0 }, red = { 0, 0 } },
 }
 
+---@type data.Sprite
+local pad_sprite = {
+	filename = __GRAPHICS_PATH__ .. "pad.png",
+	height = 70,
+	width = 83,
+	scale = 0.5,
+	shift = { 0.0078125, 0.09375 },
+	tint = { 1, 1, 1, 1 },
+}
+
 ---@type data.RotatedSprite
 local pad_pictures = {
 	layers = {
-		data_util.sprite_to_rotated(
-			data.raw["lamp"]["small-lamp"].picture_off.layers[1]
-		),
-		data_util.sprite_to_rotated(
-			data.raw["lamp"]["small-lamp"].picture_off.layers[2]
-		),
+		data_util.sprite_to_rotated(pad_sprite),
 	},
 }
 
---------------------------------------------------------------------------------
--- Buildable internal pad to bond to external pins
---------------------------------------------------------------------------------
 ---@type data.ElectricPolePrototype
 local pad = {
 	-- PrototypeBase
@@ -117,8 +125,7 @@ local pad = {
 	max_health = 1,
 
 	-- EntityPrototype
-	icon = data.raw["lamp"]["small-lamp"].icon,
-	icon_size = data.raw["lamp"]["small-lamp"].icon_size,
+	icon = __GRAPHICS_PATH__ .. "pad-icon.png",
 	collision_box = data.raw["lamp"]["small-lamp"].collision_box,
 	collision_mask = data.raw["lamp"]["small-lamp"].collision_mask,
 	selection_box = data.raw["lamp"]["small-lamp"].selection_box,
@@ -150,8 +157,7 @@ local pad_item = {
 
 	-- ItemPrototype
 	stack_size = 50,
-	icon = data.raw["item"]["small-lamp"].icon,
-	icon_size = data.raw["item"]["small-lamp"].icon_size,
+	icon = __GRAPHICS_PATH__ .. "pad-icon.png",
 	place_result = constants.pad_name,
 	flags = { "hide-from-bonus-gui", "only-in-cursor" },
 	weight = 0,
@@ -162,6 +168,7 @@ data:extend({ pad, pad_item })
 --------------------------------------------------------------------------------
 -- Internal constant combinator for defining options input.
 --------------------------------------------------------------------------------
+
 ---@type data.ConstantCombinatorPrototype
 local option =
 	table.deepcopy(data.raw["constant-combinator"]["constant-combinator"])
