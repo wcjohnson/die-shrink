@@ -5,6 +5,7 @@
 local constants = require("lib.constants")
 local tlib = require("lib.core.table")
 local strace = require("lib.core.strace")
+local option_lib = require("control.option")
 
 local pairs = pairs
 local next = next
@@ -40,11 +41,15 @@ end
 
 ---@param ic_tags Tags?
 ---@return string? blueprint_string
-local function get_ic_blueprint_string_from_tags(ic_tags)
+---@return DieShrink.OptionChoices? option_choices
+local function get_ic_info_from_tags(ic_tags)
 	if not ic_tags then return nil end
 	local _, _, tags =
 		remote.call("things-metadata-v1", "decode_blueprint_tags", ic_tags)
-	return tags and tags.blueprint --[[@as string?]]
+	if not tags then return nil end
+	local bp_string = tags.blueprint --[[@as string?]]
+	local option_choices = tags.option --[[@as DieShrink.OptionChoices?]]
+	return bp_string, option_choices
 end
 
 ---@class DieShrink.CompilerResult
@@ -70,7 +75,7 @@ end
 local function get_option_key(pos)
 	local x = pos.x or pos[1] or 0
 	local y = pos.y or pos[2] or 0
-	return sformat("%.3f,%.3f", x, y)
+	return sformat("%.2f,%.2f", x, y)
 end
 
 ---@param wires [uint, uint][]
@@ -121,11 +126,18 @@ end
 
 ---Compile a circuit from its editor blueprint.
 ---@param bp_entities string|BlueprintEntity[]
+---@param initial_options? DieShrink.OptionChoices
 ---@param recursion_level? uint
 ---@param get_next_position? fun(): MapPosition
 ---@return DieShrink.CompilerResult? result The compiled circuit, or nil if compilation failed.
-local function compile(bp_entities, recursion_level, get_next_position)
+local function compile(
+	bp_entities,
+	initial_options,
+	recursion_level,
+	get_next_position
+)
 	local result = create_empty_result()
+	initial_options = initial_options or tlib.empty
 
 	-- Compile string if needed
 	if type(bp_entities) == "string" then
@@ -144,7 +156,12 @@ local function compile(bp_entities, recursion_level, get_next_position)
 	end
 	---@cast bp_entities BlueprintEntity[]
 
-	strace.trace("Compiling from", #bp_entities, "blueprint entities")
+	strace.trace(
+		"Compiling from",
+		#bp_entities,
+		"blueprint entities with options",
+		initial_options
+	)
 	local level = recursion_level or 0
 	if not get_next_position then
 		local min_x = -0.45
@@ -247,15 +264,20 @@ local function compile(bp_entities, recursion_level, get_next_position)
 			if option_def and option_def.type then
 				local combinator_index = #result_entities + 1
 				local position = get_next_position()
+				local option_key = get_option_key(bp_entity.position)
+				option_def.key = option_key
+				local option_choice = initial_options[option_key]
 				local param = {
 					name = COMBINATOR_ENTITY_MAP["constant-combinator"],
 					position = position,
 					direction = bp_entity.direction,
+					control_behavior = option_lib.generate_option_control_behavior(
+						option_def,
+						option_choice
+					),
 				}
 				result_entities[combinator_index] = param
-
-				local option_key = get_option_key(position)
-				option_def.key = option_key
+				bp_to_compiled[bp_index] = combinator_index
 				result.options[option_key] = { option_def, combinator_index }
 			end
 		elseif entity_name == constants.pin_name then
@@ -282,10 +304,15 @@ local function compile(bp_entities, recursion_level, get_next_position)
 	for bp_index, pin_map in pairs(bp_ics) do
 		-- Compile embbeded IC.
 		local bp_entity = bp_entities[bp_index]
-		local ic_blueprint_string =
-			get_ic_blueprint_string_from_tags(bp_entity.tags)
+		local ic_blueprint_string, nested_initial_options =
+			get_ic_info_from_tags(bp_entity.tags)
 		if not ic_blueprint_string then goto continue end
-		local compiled = compile(ic_blueprint_string, level + 1, get_next_position)
+		local compiled = compile(
+			ic_blueprint_string,
+			nested_initial_options,
+			level + 1,
+			get_next_position
+		)
 		if not compiled then goto continue end
 
 		local index_offset = #result_entities

@@ -8,10 +8,29 @@ local relm_util = require("lib.core.relm.util")
 local event = require("lib.core.event")
 local constants = require("lib.constants")
 local strace = require("lib.core.strace")
+local tlib = require("lib.core.table")
 
 local HF = ultros.HFlow
+local VF = ultros.VFlow
 
 local lib = {}
+
+relm.define("IcOption.input", function(props)
+	local def = props.option_def --[[@as DieShrink.InputOptionDefinition]]
+	local choice = props.option_choice --[[@as DieShrink.InputOptionChoice]]
+	local key = props.key --[[@as string]]
+	local ic = props.ic --[[@as DieShrink.IC]]
+
+	return ultros.Labeled({ caption = def.label or key }, {
+		ultros.UncontrolledInput({
+			value = choice and choice.value,
+			numeric = true,
+			on_change = function(_, new_value)
+				ic:set_option_choice(key, { value = tonumber(new_value) })
+			end,
+		}),
+	})
+end)
 
 lib.IcUi = relm.define("IcUi", function(props)
 	local root_id = props.root_id
@@ -19,6 +38,8 @@ lib.IcUi = relm.define("IcUi", function(props)
 	local player = game.get_player(player_index)
 	local ic = props.ic --[[@as DieShrink.IC]]
 	local n_pins = ic:get_n_pins()
+	local option_choices = ic.option_choices or {}
+	local option_defs = ic.option_definitions or {}
 
 	if (not player) or not player.valid then return end
 
@@ -46,44 +67,71 @@ lib.IcUi = relm.define("IcUi", function(props)
 	relm_util.use_event_handler("dieshrink.ic_pins_changed", function(_me, _, _ic)
 		if _ic.thing_id == ic.thing_id then relm.paint(_me) end
 	end)
+	relm_util.use_event_handler(
+		"dieshrink.ic_options_changed",
+		function(_me, _, _ic)
+			if _ic.thing_id == ic.thing_id then relm.paint(_me) end
+		end
+	)
+
+	local elts = {}
+	local option_keys = {}
+	for key, _ in pairs(option_defs) do
+		option_keys[#option_keys + 1] = key
+	end
+	table.sort(option_keys)
+
+	for _, key in ipairs(option_keys) do
+		local option_def = option_defs[key] and option_defs[key][1]
+		local option_type = option_def and option_def.type
+		local option_choice = option_choices[key] or {}
+		if option_type then
+			elts[#elts + 1] = relm.element("IcOption." .. option_type, {
+				option_def = option_def,
+				option_choice = option_choice,
+				key = key,
+				ic = ic,
+			})
+		end
+	end
+
+	elts[#elts + 1] = ultros.CallIf(n_pins == 0, function()
+		return HF({ width = 300 }, {
+			ultros.Button({
+				caption = "2 pins",
+				width = 300 / 4,
+				on_click = function() ic:set_n_pins(2) end,
+			}),
+			ultros.Button({
+				caption = "4 pins",
+				width = 300 / 4,
+				on_click = function() ic:set_n_pins(4) end,
+			}),
+			ultros.Button({
+				caption = "8 pins",
+				width = 300 / 4,
+				on_click = function() ic:set_n_pins(8) end,
+			}),
+			ultros.Button({
+				caption = "16 pins",
+				width = 300 / 4,
+				on_click = function() ic:set_n_pins(16) end,
+			}),
+		})
+	end)
+
+	elts[#elts + 1] = ultros.CallIf(n_pins > 0, function()
+		return ultros.Button({
+			caption = "Open Editor",
+			on_click = function() open_editor_session(player_index, ic) end,
+		})
+	end)
 
 	return ultros.WindowFrame({
 		caption = "IC",
 		on_close = handle_close,
-	}, {
-		ultros.CallIf(n_pins == 0, function()
-			return HF({ width = 300 }, {
-				ultros.Button({
-					caption = "2 pins",
-					width = 300 / 4,
-					on_click = function() ic:set_n_pins(2) end,
-				}),
-				ultros.Button({
-					caption = "4 pins",
-					width = 300 / 4,
-					on_click = function() ic:set_n_pins(4) end,
-				}),
-				ultros.Button({
-					caption = "8 pins",
-					width = 300 / 4,
-					on_click = function() ic:set_n_pins(8) end,
-				}),
-				ultros.Button({
-					caption = "16 pins",
-					width = 300 / 4,
-					on_click = function() ic:set_n_pins(16) end,
-				}),
-			})
-		end),
-		ultros.CallIf(n_pins > 0, function()
-			return HF({ width = 300 }, {
-				ultros.Button({
-					caption = "Open Editor",
-					on_click = function() open_editor_session(player_index, ic) end,
-				}),
-			})
-		end),
-	})
+		width = 300,
+	}, elts)
 end)
 
 ---@param player LuaPlayer

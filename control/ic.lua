@@ -7,22 +7,32 @@ local orientation_lib = require("lib.core.orientation.orientation")
 local strace = require("lib.core.strace")
 local compiler = require("control.compiler")
 local linker = require("control.linker")
+local option_lib = require("control.option")
 local tlib = require("lib.core.table")
+
+local type = type
+local tonumber = tonumber
 
 ---@class DieShrink.IC
 ---@field thing_id ThingID
 ---@field alive boolean
 ---@field n_pins uint
 ---@field pin_labels {[uint]: string} Labels for pins, indexed by pin number
+---@field option_definitions {string: [DieShrink.OptionDefinition, uint]}
+---@field option_choices {string: DieShrink.OptionChoice}
 ---@field linked? DieShrink.LinkerResult Linker result for this IC.
 local IC = class("DieShrink.IC")
 _G.IC = IC
 
 function IC:new(thing_id)
-	local obj = setmetatable(
-		{ thing_id = thing_id, n_pins = 0, alive = false, pin_labels = {} },
-		self
-	)
+	local obj = setmetatable({
+		thing_id = thing_id,
+		n_pins = 0,
+		alive = false,
+		pin_labels = {},
+		option_definitions = {},
+		option_choices = {},
+	}, self)
 	local ics = storage.ics
 	if not ics then
 		ics = {}
@@ -30,6 +40,28 @@ function IC:new(thing_id)
 	end
 	ics[thing_id] = obj
 	return obj
+end
+
+---Apply options to linked constant combs.
+function IC:apply_options()
+	if not self.linked then return end
+	for key, option_info in pairs(self.option_definitions or {}) do
+		local option_def = option_info[1]
+		local entity_index = option_info[2]
+		local entity = self.linked.entities and self.linked.entities[entity_index]
+		local choice = self.option_choices and self.option_choices[key]
+		strace.trace(
+			"IC",
+			self.thing_id,
+			"applying option",
+			key,
+			"with choice",
+			choice,
+			"to entity",
+			entity
+		)
+		option_lib.apply_option_to_combinator(entity, option_def, choice)
+	end
 end
 
 ---Compile and link the IC.
@@ -57,6 +89,9 @@ function IC:link(force_recompile)
 		strace.trace("IC", self.thing_id, "is empty")
 		return
 	end
+	local option_choices = thing.tags and thing.tags.option --[[@as DieShrink.OptionChoices]]
+		or {}
+	self.option_choices = option_choices
 	local _, children = remote.call("things", "get_children", thing.id)
 	if not children then
 		strace.error("IC", self.thing_id, "is missing children")
@@ -77,12 +112,13 @@ function IC:link(force_recompile)
 		)
 		return
 	end
-	local compiled = compiler.compile(bp_string)
+	local compiled = compiler.compile(bp_string, option_choices)
 	if not compiled then
 		strace.error("Failed to compile IC with thing_id", self.thing_id)
 		return
 	end
 	self.pin_labels = compiled.labels or {}
+	self.option_definitions = compiled.options or {}
 	strace.trace(
 		"Compiled IC",
 		self.thing_id,
@@ -92,7 +128,15 @@ function IC:link(force_recompile)
 		#compiled.wires,
 		"wires"
 	)
-	strace.trace("Compiled to", compiled)
+	strace.trace(
+		"Compiled to",
+		function()
+			return serpent.line(
+				compiled,
+				{ maxlevel = 10, comment = false, nocode = true }
+			)
+		end
+	)
 	self.linked = linker.link(
 		compiled,
 		thing.entity.surface,
@@ -100,6 +144,7 @@ function IC:link(force_recompile)
 		thing.entity.position,
 		pin_entities
 	)
+	event.raise("dieshrink.ic_compiled", self)
 end
 
 ---Destroy compiled circuit and links
@@ -146,6 +191,31 @@ function IC:destroy()
 	storage.ics[self.thing_id] = nil
 end
 
+---@param key string
+---@param choice DieShrink.OptionChoice
+function IC:set_option_choice(key, choice)
+	local _, opts =
+		remote.call("things-tags-v1", "get_tag", self.thing_id, "option")
+	local next_choices = opts or {}
+	choice.key = key
+	next_choices[key] = choice
+	strace.trace(
+		"IC:set_option_choice for",
+		self.thing_id,
+		key,
+		choice,
+		": setting option tag to",
+		next_choices
+	)
+	remote.call(
+		"things-tags-v1",
+		"set_tag",
+		self.thing_id,
+		"option",
+		next_choices
+	)
+end
+
 --------------------------------------------------------------------------------
 -- IC LIFECYCLE
 --------------------------------------------------------------------------------
@@ -179,6 +249,11 @@ event.bind(
 		strace.trace("Initialized ic", ic.thing_id, "with", ic.n_pins, "pins")
 		-- Create pins
 		check_pins(thing, ic:get_n_pins(), ic)
+		-- If real, compile
+		if thing.status == "real" then
+			strace.trace("Linking IC", ic.thing_id, "due to built as real")
+			ic:link()
+		end
 	end
 )
 
@@ -256,7 +331,14 @@ event.bind(
 		then
 			strace.trace("Blueprint tag changed for IC", ic.thing_id, "relinking")
 			ic:link(true)
+			return
 		end
+
+		-- TODO: consider diffing here?
+		ic.option_choices = ev.new_tags and ev.new_tags.option --[[@as DieShrink.OptionChoices]]
+			or {}
+		ic:apply_options()
+		event.raise("dieshrink.ic_options_changed", ic)
 	end
 )
 
