@@ -17,7 +17,30 @@ local lib = {}
 
 local mode_opts = {
 	{ key = "input", caption = "Numeric Input" },
+	{ key = "signals", caption = "Signal Inputs" },
 }
+
+relm.define("OptionUi.signals", function(props)
+	local session = props.session --[[@as DieShrink.EditorSession]]
+	local ic = props.ic --[[@as DieShrink.IC]]
+	local unit_number = props.unit_number
+
+	local current_def = session:get_option_definition(unit_number) --[[@as DieShrink.SignalsOptionDefinition]]
+
+	return {
+		ultros.Labeled({ caption = "Label" }, {
+			ultros.UncontrolledInput({
+				value = current_def.label,
+				on_change = function(_, new_label)
+					session:set_option_definition(
+						unit_number,
+						assign({}, current_def, { label = tostring(new_label) })
+					)
+				end,
+			}),
+		}),
+	}
+end)
 
 relm.define("OptionUi.input", function(props)
 	local session = props.session --[[@as DieShrink.EditorSession]]
@@ -27,6 +50,17 @@ relm.define("OptionUi.input", function(props)
 	local current_def = session:get_option_definition(unit_number) --[[@as DieShrink.InputOptionDefinition]]
 
 	return {
+		ultros.Labeled({ caption = "Label" }, {
+			ultros.UncontrolledInput({
+				value = current_def.label,
+				on_change = function(_, new_label)
+					session:set_option_definition(
+						unit_number,
+						assign({}, current_def, { label = tostring(new_label) })
+					)
+				end,
+			}),
+		}),
 		ultros.Labeled({ caption = "Signal" }, {
 			ultros.SignalPicker({
 				value = current_def.signal,

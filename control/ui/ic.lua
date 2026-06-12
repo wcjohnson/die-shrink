@@ -12,6 +12,8 @@ local tlib = require("lib.core.table")
 
 local HF = ultros.HFlow
 local VF = ultros.VFlow
+local Pr = relm.Primitive
+local EMPTY = tlib.EMPTY
 
 local lib = {}
 
@@ -21,7 +23,7 @@ relm.define("IcOption.input", function(props)
 	local key = props.key --[[@as string]]
 	local ic = props.ic --[[@as DieShrink.IC]]
 
-	return ultros.Labeled({ caption = def.label or key }, {
+	return ultros.Labeled({ caption = def.label or "Unlabelled input" }, {
 		ultros.UncontrolledInput({
 			value = choice and choice.value,
 			numeric = true,
@@ -30,6 +32,26 @@ relm.define("IcOption.input", function(props)
 			end,
 		}),
 	})
+end)
+
+relm.define("IcOption.signals", function(props)
+	local def = props.option_def --[[@as DieShrink.SignalsOptionDefinition]]
+	local choice = props.option_choice --[[@as DieShrink.SignalsOptionChoice]]
+	local key = props.key --[[@as string]]
+	local ic = props.ic --[[@as DieShrink.IC]]
+
+	return {
+		ultros.BoldLabel(def.label or "Unlabelled signals"),
+		Pr({ type = "line" }),
+		ultros.SignalCountsInput({
+			column_count = 8,
+			signals = choice and choice.signals or EMPTY,
+			counts = choice and choice.counts or EMPTY,
+			on_change = function(_, signals, counts)
+				ic:set_option_choice(key, { signals = signals, counts = counts })
+			end,
+		}),
+	}
 end)
 
 lib.IcUi = relm.define("IcUi", function(props)
@@ -130,7 +152,7 @@ lib.IcUi = relm.define("IcUi", function(props)
 	return ultros.WindowFrame({
 		caption = "IC",
 		on_close = handle_close,
-		width = 300,
+		width = 345,
 	}, elts)
 end)
 

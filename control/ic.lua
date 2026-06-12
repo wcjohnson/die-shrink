@@ -197,7 +197,6 @@ function IC:set_option_choice(key, choice)
 	local _, opts =
 		remote.call("things-tags-v1", "get_tag", self.thing_id, "option")
 	local next_choices = opts or {}
-	choice.key = key
 	next_choices[key] = choice
 	strace.trace(
 		"IC:set_option_choice for",

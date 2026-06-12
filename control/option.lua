@@ -3,7 +3,10 @@
 --------------------------------------------------------------------------------
 
 local sig_lib = require("lib.core.signal")
+local tlib = require("lib.core.table")
 local strace = require("lib.core.strace")
+
+local EMPTY = tlib.EMPTY
 
 ---@class DieShrink.OptionDefinition
 ---@field type string The type of the option, which determines how the option is rendered in the UI and how user input is processed. Required.
@@ -17,11 +20,17 @@ local strace = require("lib.core.strace")
 ---@field default? int Default value for the option if the user blanks the field.
 ---@field signal? SignalID The signal that will be sent into the IC with the value of the option.
 
+---@class DieShrink.SignalsOptionDefinition : DieShrink.OptionDefinition
+---@field type "signals"
+
 ---@class DieShrink.OptionChoice
----@field key string The key of the option for which the choice applies.
 
 ---@class DieShrink.InputOptionChoice : DieShrink.OptionChoice
 ---@field value int The chosen value.
+
+---@class DieShrink.SignalsOptionChoice: DieShrink.OptionChoice
+---@field signals SignalID[] The chosen signals
+---@field counts int32[] The corresponding values for the chosen signals
 
 ---@alias DieShrink.OptionChoices {[string]: DieShrink.OptionChoice}
 
@@ -37,6 +46,16 @@ local function generate_input_control_behavior(option_def, option_choice)
 	return sig_lib.compose_simple_ccbpcb({ signal }, nil, value)
 end
 
+---@param option_def DieShrink.SignalsOptionDefinition
+---@param option_choice DieShrink.SignalsOptionChoice?
+local function generate_signals_control_behavior(option_def, option_choice)
+	if not option_choice then return nil end
+	return sig_lib.compose_simple_ccbpcb(
+		option_choice.signals or EMPTY,
+		option_choice.counts or EMPTY
+	)
+end
+
 ---@param option_def DieShrink.OptionDefinition?
 ---@param option_choice DieShrink.OptionChoice?
 ---@return ConstantCombinatorBlueprintControlBehavior? control_behavior
@@ -45,19 +64,36 @@ function lib.generate_option_control_behavior(option_def, option_choice)
 		---@cast option_choice DieShrink.InputOptionChoice
 		---@cast option_def DieShrink.InputOptionDefinition
 		return generate_input_control_behavior(option_def, option_choice)
+	elseif option_def and option_def.type == "signals" then
+		---@cast option_def DieShrink.SignalsOptionDefinition
+		---@cast option_choice DieShrink.SignalsOptionChoice
+		return generate_signals_control_behavior(option_def, option_choice)
 	end
 end
 
 ---@param comb LuaEntity A constant combinator entity.
 ---@param cb LuaConstantCombinatorControlBehavior The combinator's control behavior.
 ---@param option_def DieShrink.InputOptionDefinition
----@param option_choice DieShrink.InputOptionChoice
+---@param option_choice DieShrink.InputOptionChoice?
 local function apply_input_option(comb, cb, option_def, option_choice)
 	local signal = option_def.signal
-	local value = option_choice.value
+	local value = option_choice and option_choice.value
 	if not signal or not value then return end
 
 	sig_lib.apply_simple_cccb(cb, { signal }, nil, value)
+end
+
+---@param comb LuaEntity A constant combinator entity.
+---@param cb LuaConstantCombinatorControlBehavior The combinator's control behavior.
+---@param option_def DieShrink.SignalsOptionDefinition
+---@param option_choice DieShrink.SignalsOptionChoice?
+local function apply_signals_option(comb, cb, option_def, option_choice)
+	if not option_choice then return end
+	sig_lib.apply_simple_cccb(
+		cb,
+		option_choice.signals or EMPTY,
+		option_choice.counts or EMPTY
+	)
 end
 
 ---@param comb LuaEntity? A constant combinator entity.
@@ -71,6 +107,10 @@ function lib.apply_option_to_combinator(comb, option_def, option_choice)
 		---@cast option_def DieShrink.InputOptionDefinition
 		---@cast option_choice DieShrink.InputOptionChoice
 		apply_input_option(comb, cb, option_def, option_choice)
+	elseif option_def and option_def.type == "signals" then
+		---@cast option_def DieShrink.SignalsOptionDefinition
+		---@cast option_choice DieShrink.SignalsOptionChoice
+		apply_signals_option(comb, cb, option_def, option_choice)
 	end
 end
 
