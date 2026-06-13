@@ -234,7 +234,11 @@ local function compile(
 			bp_to_compiled[bp_index] = combinator_index
 		elseif entity_name == constants.pad_name then
 			-- Create and map pad connector.
-			local tags = bp_entity.tags
+			local _, _, tags = remote.call(
+				"things-metadata-v1",
+				"decode_blueprint_tags",
+				bp_entity.tags
+			)
 			local pin_number = tags and tags.pin --[[@as uint?]]
 			if pin_number then
 				local connector_index = #result_entities + 1
@@ -260,7 +264,11 @@ local function compile(
 				)
 			end
 		elseif entity_name == constants.option_name then
-			local option_def = bp_entity.tags
+			local _, _, option_def = remote.call(
+				"things-metadata-v1",
+				"decode_blueprint_tags",
+				bp_entity.tags
+			)
 			if option_def and option_def.type then
 				local combinator_index = #result_entities + 1
 				local position = get_next_position()

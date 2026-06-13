@@ -20,19 +20,19 @@ lib.PadUi = relm.define("PadUi", function(props)
 	if (not player) or not player.valid then return end
 	local session = props.session --[[@as DieShrink.EditorSession]]
 	local ic = props.ic --[[@as DieShrink.IC]]
-	local pad_unit_number = props.pad_unit_number
+	local pad_thing_id = props.pad_thing_id
 
 	-- Pin info
-	local current_pin = session:get_pad_pin(pad_unit_number)
+	local current_pin = session:get_pad_pin(pad_thing_id)
 	local pin_opts = {}
 	for i = 1, ic:get_n_pins() do
 		pin_opts[i] = { key = i, caption = tostring(i) }
 	end
 
 	-- Label
-	local label_value = session:get_pad_label(pad_unit_number) or ""
+	local label_value = session:get_pad_label(pad_thing_id) or ""
 	local set_label = function(_, new_label)
-		session:set_pad_label(pad_unit_number, new_label)
+		session:set_pad_label(pad_thing_id, new_label)
 	end
 
 	-- Window management
@@ -51,10 +51,8 @@ lib.PadUi = relm.define("PadUi", function(props)
 	-- Repaint
 	relm_util.use_event_handler(
 		"dieshrink.editor_session_pad_changed",
-		function(_me, _, _session, _unit_number)
-			if _session == session and _unit_number == pad_unit_number then
-				relm.paint(_me)
-			end
+		function(_me, _, _session, _id)
+			if _session == session and _id == pad_thing_id then relm.paint(_me) end
 		end
 	)
 
@@ -67,7 +65,7 @@ lib.PadUi = relm.define("PadUi", function(props)
 			ultros.Dropdown({
 				options = pin_opts,
 				value = current_pin,
-				on_change = function(_, pin) session:set_pad_pin(pad_unit_number, pin) end,
+				on_change = function(_, pin) session:set_pad_pin(pad_thing_id, pin) end,
 			}),
 		}),
 		ultros.Labeled({ caption = "Pin label" }, {
@@ -84,15 +82,15 @@ end)
 ---@param player LuaPlayer
 ---@param ic DieShrink.IC
 ---@param session DieShrink.EditorSession
----@param pad_unit_number uint
-function _G.open_pad_ui(player, ic, session, pad_unit_number)
+---@param pad_thing_id uint
+function _G.open_pad_ui(player, ic, session, pad_thing_id)
 	-- Already open
 	if player.gui.screen["DieShrinkPadUi"] then return end
 	relm.root_create(
 		player.gui.screen,
 		"DieShrinkPadUi",
 		"PadUi",
-		{ ic = ic, session = session, pad_unit_number = pad_unit_number }
+		{ ic = ic, session = session, pad_thing_id = pad_thing_id }
 	)
 end
 
@@ -106,11 +104,13 @@ event.bind(defines.events.on_gui_opened, function(ev)
 
 	local session = get_editor_session_for_surface(selected.surface_index)
 	if not session then return end
+	local _, thing_id = remote.call("things", "get_thing_id", selected)
+	if not thing_id then return end
 
 	-- Close any existing ui
 	player.opened = nil
 
-	open_pad_ui(player, session.ic, session, selected.unit_number)
+	open_pad_ui(player, session.ic, session, thing_id)
 end)
 
 return lib

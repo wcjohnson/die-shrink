@@ -14,6 +14,8 @@ data:extend({
 	{ type = "custom-event", name = "die-shrink-on_tags_changed" },
 	{ type = "custom-event", name = "die-shrink-on_pin_status" },
 	{ type = "custom-event", name = "die-shrink-on_pin_immediate_voided" },
+	{ type = "custom-event", name = "die-shrink-on_editor_thing_initialized" },
+	{ type = "custom-event", name = "die-shrink-on_editor_thing_tags_changed" },
 	{
 		type = "custom-input",
 		name = "die-shrink-click",
@@ -21,8 +23,7 @@ data:extend({
 	},
 })
 
-local PIN_OFFSET = 0.4
-local INNER_PIN_OFFSET = 0.2
+local thing_registrations = data.raw["mod-data"]["things-names"].data
 
 ---@type things.ThingRegistration
 local ic_registration = {
@@ -37,7 +38,7 @@ local ic_registration = {
 		on_tags_changed = "die-shrink-on_tags_changed",
 	},
 }
-data.raw["mod-data"]["things-names"].data["die-shrink-ic"] = ic_registration
+thing_registrations["die-shrink-ic"] = ic_registration
 
 ---@type things.ThingRegistration
 local pin_registration = {
@@ -50,4 +51,26 @@ local pin_registration = {
 		on_immediate_voided = "die-shrink-on_pin_immediate_voided",
 	},
 }
-data.raw["mod-data"]["things-names"].data["die-shrink-pin"] = pin_registration
+thing_registrations["die-shrink-pin"] = pin_registration
+
+---@type things.ThingRegistration
+local pad_registration = {
+	name = "die-shrink-pad",
+	intercept_construction = true,
+	custom_events = {
+		on_initialized = "die-shrink-on_editor_thing_initialized",
+		on_tags_changed = "die-shrink-on_editor_thing_tags_changed",
+	},
+}
+thing_registrations["die-shrink-pad"] = pad_registration
+
+---@type things.ThingRegistration
+local option_registration = {
+	name = "die-shrink-option",
+	intercept_construction = true,
+	custom_events = {
+		on_initialized = "die-shrink-on_editor_thing_initialized",
+		on_tags_changed = "die-shrink-on_editor_thing_tags_changed",
+	},
+}
+thing_registrations["die-shrink-option"] = option_registration

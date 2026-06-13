@@ -23,9 +23,9 @@ local mode_opts = {
 relm.define("OptionUi.signals", function(props)
 	local session = props.session --[[@as DieShrink.EditorSession]]
 	local ic = props.ic --[[@as DieShrink.IC]]
-	local unit_number = props.unit_number
+	local thing_id = props.thing_id
 
-	local current_def = session:get_option_definition(unit_number) --[[@as DieShrink.SignalsOptionDefinition]]
+	local current_def = session:get_option_definition(thing_id) --[[@as DieShrink.SignalsOptionDefinition]]
 
 	return {
 		ultros.Labeled({ caption = "Label" }, {
@@ -33,7 +33,7 @@ relm.define("OptionUi.signals", function(props)
 				value = current_def.label,
 				on_change = function(_, new_label)
 					session:set_option_definition(
-						unit_number,
+						thing_id,
 						assign({}, current_def, { label = tostring(new_label) })
 					)
 				end,
@@ -45,9 +45,9 @@ end)
 relm.define("OptionUi.input", function(props)
 	local session = props.session --[[@as DieShrink.EditorSession]]
 	local ic = props.ic --[[@as DieShrink.IC]]
-	local unit_number = props.unit_number
+	local thing_id = props.thing_id
 
-	local current_def = session:get_option_definition(unit_number) --[[@as DieShrink.InputOptionDefinition]]
+	local current_def = session:get_option_definition(thing_id) --[[@as DieShrink.InputOptionDefinition]]
 
 	return {
 		ultros.Labeled({ caption = "Label" }, {
@@ -55,7 +55,7 @@ relm.define("OptionUi.input", function(props)
 				value = current_def.label,
 				on_change = function(_, new_label)
 					session:set_option_definition(
-						unit_number,
+						thing_id,
 						assign({}, current_def, { label = tostring(new_label) })
 					)
 				end,
@@ -67,7 +67,7 @@ relm.define("OptionUi.input", function(props)
 				on_change = function(_, new_signal)
 					if not new_signal then return end
 					session:set_option_definition(
-						unit_number,
+						thing_id,
 						assign({}, current_def, { signal = new_signal })
 					)
 				end,
@@ -83,9 +83,9 @@ lib.OptionUi = relm.define("OptionUi", function(props)
 	if (not player) or not player.valid then return end
 	local session = props.session --[[@as DieShrink.EditorSession]]
 	local ic = props.ic --[[@as DieShrink.IC]]
-	local unit_number = props.unit_number
+	local thing_id = props.thing_id
 
-	local current_def = session:get_option_definition(unit_number)
+	local current_def = session:get_option_definition(thing_id)
 	local def_type = current_def and current_def.type
 
 	-- Window management
@@ -105,7 +105,7 @@ lib.OptionUi = relm.define("OptionUi", function(props)
 	relm_util.use_event_handler(
 		"dieshrink.editor_session_option_changed",
 		function(_me, _, _session, _unit_number)
-			if _session == session and _unit_number == unit_number then
+			if _session == session and _unit_number == thing_id then
 				relm.paint(_me)
 			end
 		end
@@ -122,7 +122,7 @@ lib.OptionUi = relm.define("OptionUi", function(props)
 				value = current_def and current_def.type,
 				on_change = function(_, new_mode)
 					if not new_mode then return end
-					session:set_option_definition(unit_number, { type = new_mode })
+					session:set_option_definition(thing_id, { type = new_mode })
 				end,
 			}),
 		}),
@@ -131,7 +131,7 @@ lib.OptionUi = relm.define("OptionUi", function(props)
 			function()
 				return relm.element(
 					"OptionUi." .. def_type,
-					{ session = session, ic = ic, unit_number = unit_number }
+					{ session = session, ic = ic, thing_id = thing_id }
 				)
 			end
 		),
@@ -141,15 +141,15 @@ end)
 ---@param player LuaPlayer
 ---@param ic DieShrink.IC
 ---@param session DieShrink.EditorSession
----@param unit_number uint
-function _G.open_option_ui(player, ic, session, unit_number)
+---@param thing_id uint
+function _G.open_option_ui(player, ic, session, thing_id)
 	-- Already open
 	if player.gui.screen["DieShrinkOptionUi"] then return end
 	relm.root_create(
 		player.gui.screen,
 		"DieShrinkOptionUi",
 		"OptionUi",
-		{ ic = ic, session = session, unit_number = unit_number }
+		{ ic = ic, session = session, thing_id = thing_id }
 	)
 end
 
@@ -161,15 +161,15 @@ event.bind(defines.events.on_gui_opened, function(ev)
 	if not selected then return end
 	if selected.name ~= constants.option_name then return end
 
-	strace.trace("option_gui_opened", ev.player_index, selected)
-
 	-- Close any existing ui
 	player.opened = nil
 
 	local session = get_editor_session_for_surface(selected.surface_index)
 	if not session then return end
+	local _, thing_id = remote.call("things", "get_thing_id", selected)
+	if not thing_id then return end
 
-	open_option_ui(player, session.ic, session, selected.unit_number)
+	open_option_ui(player, session.ic, session, thing_id)
 end)
 
 return lib
