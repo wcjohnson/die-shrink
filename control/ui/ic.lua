@@ -167,6 +167,7 @@ end
 event.bind("die-shrink-click", function(ev)
 	local player = game.get_player(ev.player_index)
 	if not player then return end
+	if not player.is_cursor_empty() then return end
 
 	local selected = player.selected
 	if not selected or not selected.valid then return end
