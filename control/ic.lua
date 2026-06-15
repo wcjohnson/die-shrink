@@ -12,6 +12,7 @@ local tlib = require("lib.core.table")
 
 local type = type
 local tonumber = tonumber
+local EMPTY = tlib.EMPTY
 
 ---@class DieShrink.IC
 ---@field thing_id ThingID
@@ -79,7 +80,7 @@ function IC:link(force_recompile)
 		strace.trace("IC", self.thing_id, "has not been configured yet.")
 		return
 	end
-	local _, thing = remote.call("things-metadata-v1", "get", self.thing_id)
+	local _, thing = remote.call("things", "get", self.thing_id)
 	if (not thing) or thing.status ~= "real" then
 		strace.info("IC", self.thing_id, "is not real, skipping link")
 		return
@@ -169,6 +170,46 @@ end
 
 function IC:get_n_pins() return self.n_pins end
 
+---@return string?
+function IC:get_label()
+	local _, value =
+		remote.call("things-tags-v1", "get_tag", self.thing_id, "label")
+	if type(value) ~= "string" or value == "" then return nil end
+	return value
+end
+
+---@param label string?
+function IC:set_label(label)
+	if type(label) ~= "string" or label == "" then label = nil end
+	remote.call(
+		"things-tags-v1",
+		"set_tag",
+		self.thing_id,
+		"label",
+		label --[[@as any]]
+	)
+end
+
+---@return SignalID[]?
+function IC:get_icons()
+	local _, value =
+		remote.call("things-tags-v1", "get_tag", self.thing_id, "icons")
+	if type(value) ~= "table" or (not next(value)) then return nil end
+	return value
+end
+
+---@param icons SignalID[]?
+function IC:set_icons(icons)
+	if #icons == 0 then icons = nil end
+	remote.call(
+		"things-tags-v1",
+		"set_tag",
+		self.thing_id,
+		"icons",
+		icons --[[@as any]]
+	)
+end
+
 function IC:set_n_pins(n)
 	if self.n_pins == n then return end
 	if self.n_pins ~= 0 then
@@ -213,6 +254,86 @@ function IC:set_option_choice(key, choice)
 		"option",
 		next_choices
 	)
+end
+
+---@param signal (SignalID|SignalFilter)
+---@return string
+local function signal_to_sprite(signal)
+	local ty = signal.type
+	if ty == "virtual" then
+		return "virtual-signal/" .. signal.name
+	elseif ty == nil then
+		return "item/" .. signal.name
+	else
+		return ty .. "/" .. signal.name
+	end
+end
+
+local ICON_LAYOUTS = {
+	[1] = {
+		scale = 0.95,
+		offsets = {
+			{ 0, 0 },
+		},
+	},
+	[2] = {
+		scale = 0.5,
+		offsets = {
+			{ -0.24, 0 },
+			{ 0.24, 0 },
+		},
+	},
+	[3] = {
+		scale = 0.4,
+		offsets = {
+			{ -0.24, -0.24 },
+			{ 0.24, -0.24 },
+			{ -0.24, 0.24 },
+		},
+	},
+	[4] = {
+		scale = 0.4,
+		offsets = {
+			{ -0.24, -0.24 },
+			{ 0.24, -0.24 },
+			{ -0.24, 0.24 },
+			{ 0.24, 0.24 },
+		},
+	},
+}
+
+function IC:apply_icons()
+	local icons = self:get_icons() or EMPTY
+	local icon_count = #icons
+	if icon_count > 4 then icon_count = 4 end
+	if icon_count == 0 then icon_count = 1 end
+	local layout = ICON_LAYOUTS[icon_count] or ICON_LAYOUTS[1]
+	local _, thing = remote.call("things-metadata-v1", "get", self.thing_id)
+	if not thing then return end
+	local entity = thing.entity
+	if not entity then return end
+	for i = 1, 4 do
+		local signal = icons[i]
+		local ro = nil
+		if signal then
+			local offset = layout.offsets[i] or { 0, 0 }
+			ro = rendering.draw_sprite({
+				sprite = signal_to_sprite(signal),
+				surface = entity.surface,
+				target = { entity = entity, offset = offset },
+				x_scale = layout.scale,
+				y_scale = layout.scale,
+				render_layer = "lower-object",
+			})
+		end
+		remote.call(
+			"things-render-object-v1",
+			"attach_render_object",
+			self.thing_id,
+			"icon" .. i,
+			ro
+		)
+	end
 end
 
 --------------------------------------------------------------------------------
@@ -302,6 +423,12 @@ event.bind(
 		if new_status == "real" then
 			strace.trace("Linking IC", ic.thing_id, "due to status change to real")
 			ic:link()
+			strace.trace(
+				"Applying icons for IC",
+				ic.thing_id,
+				"due to status change to real"
+			)
+			ic:apply_icons()
 		end
 	end
 )
@@ -337,7 +464,9 @@ event.bind(
 		ic.option_choices = ev.new_tags and ev.new_tags.option --[[@as DieShrink.OptionChoices]]
 			or {}
 		ic:apply_options()
+		ic:apply_icons()
 		event.raise("dieshrink.ic_options_changed", ic)
+		event.raise("dieshrink.ic_labels_changed", ic)
 	end
 )
 

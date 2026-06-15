@@ -10,6 +10,7 @@ local constants = require("lib.constants")
 local cursor_lib = require("lib.core.cursor")
 
 local HF = ultros.HFlow
+local VF = ultros.VFlow
 local pad_sprite_name = "item/" .. constants.pad_name
 local option_sprite_name = "item/" .. constants.option_name
 
@@ -24,6 +25,7 @@ lib.EditorUi = relm.define("EditorUi", function(props)
 	if not player_state then return end
 	local session = props.session --[[@as DieShrink.EditorSession]]
 	local ic = session.ic --[[@as DieShrink.IC]]
+	local ic_id = ic.thing_id
 
 	-- Window management
 	local function close_me() relm.root_destroy(root_id) end
@@ -61,6 +63,26 @@ lib.EditorUi = relm.define("EditorUi", function(props)
 	)
 	local function pop_one_editor() close_current_editor_session(player_index) end
 
+	-- Editables
+	relm_util.use_event_handler(
+		"dieshrink.ic_labels_changed",
+		function(_me, _, _ic)
+			if _ic and _ic.thing_id == ic_id then relm.paint(_me) end
+		end
+	)
+
+	local icons = ic:get_icons() or {}
+
+	local function set_icon_value(index, signal)
+		icons[index] = signal
+
+		local compact = {}
+		for _, icon in ipairs(icons) do
+			if icon then compact[#compact + 1] = icon end
+		end
+		ic:set_icons(compact)
+	end
+
 	return ultros.WindowFrame({
 		caption = { "die-shrink-editor.title" },
 		closable = false,
@@ -85,6 +107,40 @@ lib.EditorUi = relm.define("EditorUi", function(props)
 			"",
 			"Editor stack:",
 			serpent.line(player_state.editor_session_stack),
+		}),
+		ultros.Labeled({ caption = "Label" }, {
+			ultros.UncontrolledInput({
+				value = ic:get_label() or "",
+				on_change = function(_, new_label)
+					local value = tostring(new_label or "")
+					if value == "" then
+						ic:set_label(nil)
+					else
+						ic:set_label(value)
+					end
+				end,
+			}),
+		}),
+		VF({
+			ultros.Label("Icons"),
+			HF({ width = 300 }, {
+				ultros.SignalPicker({
+					value = icons[1],
+					on_change = function(_, signal) set_icon_value(1, signal) end,
+				}),
+				ultros.SignalPicker({
+					value = icons[2],
+					on_change = function(_, signal) set_icon_value(2, signal) end,
+				}),
+				ultros.SignalPicker({
+					value = icons[3],
+					on_change = function(_, signal) set_icon_value(3, signal) end,
+				}),
+				ultros.SignalPicker({
+					value = icons[4],
+					on_change = function(_, signal) set_icon_value(4, signal) end,
+				}),
+			}),
 		}),
 		ultros.Button({
 			caption = "Exit",
