@@ -373,6 +373,7 @@ event.bind(
 		if thing.status == "real" then
 			strace.trace("Linking IC", ic.thing_id, "due to built as real")
 			ic:link()
+			ic:apply_icons()
 		end
 	end
 )
@@ -423,11 +424,6 @@ event.bind(
 		if new_status == "real" then
 			strace.trace("Linking IC", ic.thing_id, "due to status change to real")
 			ic:link()
-			strace.trace(
-				"Applying icons for IC",
-				ic.thing_id,
-				"due to status change to real"
-			)
 			ic:apply_icons()
 		end
 	end

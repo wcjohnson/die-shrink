@@ -227,31 +227,3 @@ event.bind(
 		player.opened = nil
 	end
 )
-
---------------------------------------------------------------------------------
--- CLEAR ORPHANED PINS
---------------------------------------------------------------------------------
-
-commands.add_command(
-	"die-shrink-clear-orphaned-pins",
-	"Clear orphaned pin entities.",
-	function(cmd)
-		local count = 0
-		for _, surface in pairs(game.surfaces) do
-			local pins = surface.find_entities_filtered({ name = "die-shrink-pin" })
-			for _, pin in pairs(pins) do
-				local _, thing = remote.call("things", "get", pin)
-				if thing then
-					if not thing.parent then
-						remote.call("things", "force_destroy", thing.id)
-						count = count + 1
-					end
-				else
-					pin.destroy()
-					count = count + 1
-				end
-			end
-		end
-		game.print({ "", "Destroyed ", count, " orphaned pins" })
-	end
-)

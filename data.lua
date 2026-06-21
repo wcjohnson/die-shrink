@@ -1,5 +1,9 @@
 local oc_lib = require("lib.core.orientation.orientation-class")
 
+-- Bootstrap Relm data phase
+_G.__RELM_GRAPHICS_PATH__ = "__die-shrink__/lib/core/relm/graphics/"
+require("lib.core.relm.relm_data")
+
 require("data.pin")
 require("data.ic")
 require("data.tech")
