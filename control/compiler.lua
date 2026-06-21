@@ -85,11 +85,29 @@ end
 ---@param b uint
 ---@param b_connector defines.wire_connector_id
 local function add_wire(wires, dedupe, a, a_connector, b, b_connector)
-	if not a or not b or a == b then return end
+	if not a or not b then return end
+	if a == b and a_connector == b_connector then return end
+
 	local left = min(a, b)
-	local left_connector = a == left and a_connector or b_connector
 	local right = max(a, b)
-	local right_connector = a == left and b_connector or a_connector
+	local left_connector
+	local right_connector
+	if a == b then
+		---@diagnostic disable-next-line
+		if a_connector <= b_connector then
+			left_connector = a_connector
+			right_connector = b_connector
+		else
+			left_connector = b_connector
+			right_connector = a_connector
+		end
+	elseif a == left then
+		left_connector = a_connector
+		right_connector = b_connector
+	else
+		left_connector = b_connector
+		right_connector = a_connector
+	end
 	local proposed_wire = { left, left_connector, right, right_connector }
 	local key = tconcat(proposed_wire, ":")
 	if dedupe[key] then return false end
