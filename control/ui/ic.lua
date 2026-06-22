@@ -23,7 +23,9 @@ relm.define("IcOption.input", function(props)
 	local key = props.key --[[@as string]]
 	local ic = props.ic --[[@as DieShrink.IC]]
 
-	return ultros.Labeled({ caption = def.label or "Unlabelled input" }, {
+	return {
+		ultros.BoldLabel(def.label or "Unlabelled input"),
+		Pr({ type = "line" }),
 		ultros.UncontrolledInput({
 			value = choice and choice.value,
 			numeric = true,
@@ -31,7 +33,7 @@ relm.define("IcOption.input", function(props)
 				ic:set_option_choice(key, { value = tonumber(new_value) })
 			end,
 		}),
-	})
+	}
 end)
 
 relm.define("IcOption.signals", function(props)
@@ -150,7 +152,7 @@ lib.IcUi = relm.define("IcUi", function(props)
 	end)
 
 	return ultros.WindowFrame({
-		caption = "IC",
+		caption = ic:get_label() or "IC",
 		on_close = handle_close,
 		width = 345,
 	}, elts)
