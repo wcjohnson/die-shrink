@@ -61,8 +61,6 @@ Notes:
 
 ## Safety Boundaries
 
-- Treat `learning/compaktcircuit/` as reference material. Do not edit it unless
-  the task explicitly asks for changes there.
 - Avoid save-breaking changes unless explicitly requested.
 - Avoid changing public names/IDs of prototypes and custom events unless the
   task requires migration-aware changes.
@@ -71,17 +69,15 @@ Notes:
 
 Before finalizing a change:
 
-1. Ensure touched Lua files remain stylua-compatible with project settings.
-2. Verify data-stage and runtime-stage require paths are correct.
-3. Verify locale keys exist for any new user-facing strings.
-4. Update `changelog.txt` and `info.json` version when preparing release
+1. Verify data-stage and runtime-stage require paths are correct.
+2. Verify locale keys exist for any new user-facing strings.
+3. Update `changelog.txt` and `info.json` version when preparing release
    changes.
-5. Summarize any migration risk if entity names, event names, or stored state
+4. Summarize any migration risk if entity names, event names, or stored state
    shapes change.
 
 ## Out Of Scope By Default
 
-- Adding non-essential features from Compakt Circuits not aligned with Die
-  Shrink's minimal scope.
+- Adding non-essential features not aligned with Die Shrink's minimal scope.
 - Modifying the internal framework under `lib/core/` without explicit need.
 - Large-scale renames of core entities, events, or storage keys.

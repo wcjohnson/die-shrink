@@ -1,6 +1,6 @@
 # Die Shrink
 
-**This mod is currently in an Alpha state. Known issues and crashes ARE present. Beware!**
+**This mod is currently in ALPHA. Bugs, crashes, save, and blueprint breaks are very possible. Beware!**
 
 Die Shrink allows the creation of Integrated Circuits, which are small combinators that contain an internal circuit network. This network can contain many combinators, and interfaces with external circuitry through a set of I/O pins.
 
