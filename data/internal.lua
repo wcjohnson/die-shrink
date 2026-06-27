@@ -81,6 +81,7 @@ data:extend({ energy_source })
 
 ---@type data.WireConnectionPoint
 local ZERO_CONNECTION_POINT = {
+	-- XXX: TYPES: FMTK vector type issue
 	wire = { green = { 0, 0 }, red = { 0, 0 } },
 	shadow = { green = { 0, 0 }, red = { 0, 0 } },
 }
@@ -91,6 +92,7 @@ local pad_sprite = {
 	height = 70,
 	width = 83,
 	scale = 0.5,
+	-- XXX: TYPES: FMTK vector type issue
 	shift = { 0.0078125, 0.09375 },
 	tint = { 1, 1, 1, 1 },
 }
@@ -189,8 +191,10 @@ option.flags = {
 option.created_smoke = nil
 
 local hr_sprite = __GRAPHICS_PATH__ .. "option-combinator.png"
+---@diagnostic disable-next-line: need-check-nil
 option.sprites.east.layers[1].filename = hr_sprite
 option.sprites.west.layers[1].filename = hr_sprite
+---@diagnostic disable-next-line: need-check-nil
 option.sprites.north.layers[1].filename = hr_sprite
 option.sprites.south.layers[1].filename = hr_sprite
 

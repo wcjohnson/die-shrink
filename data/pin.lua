@@ -20,6 +20,7 @@ local pin_pictures = {
 
 ---@type data.WireConnectionPoint
 local ZERO_CONNECTION_POINT = {
+	-- XXX: TYPES: FMTK vector type issue
 	wire = { green = { 0, 0 }, red = { 0, 0 } },
 	shadow = { green = { 0, 0 }, red = { 0, 0 } },
 }
