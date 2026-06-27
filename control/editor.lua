@@ -807,6 +807,7 @@ function _G.close_editor_session(session_id)
 			player.set_controller({
 				type = defines.controllers.remote,
 				surface = next_session.surface,
+				-- XXX: TYPES: FMTK numeric vector bug
 				position = { 0, 0 },
 			})
 			if player.zoom < EDITOR_ENTRY_MIN_ZOOM then

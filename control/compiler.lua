@@ -14,6 +14,7 @@ local min = math.min
 local max = math.max
 local tconcat = table.concat
 local sformat = string.format
+local EMPTY = tlib.EMPTY
 
 local lib = {}
 
@@ -57,7 +58,7 @@ end
 ---@field wires [uint,defines.wire_connector_id,uint,defines.wire_connector_id][] List of wires between entities that should be restored when building.
 ---@field labels {[uint]: string} Mapping of pin index to label text
 ---@field pad_map {[uint]: uint[]} Mapping of external IC pin number to corresponding pad connector indices within `entities`.
----@field options {string: [DieShrink.OptionDefinition, uint]} List of option definitions available inside the IC along with pointers to the constant combinators representing them in `entities`.
+---@field options {[string]: [DieShrink.OptionDefinition, uint]} List of option definitions available inside the IC along with pointers to the constant combinators representing them in `entities`.
 
 ---@return DieShrink.CompilerResult
 local function create_empty_result()
@@ -78,7 +79,7 @@ local function get_option_key(pos)
 	return sformat("%.2f,%.2f", x, y)
 end
 
----@param wires [uint, uint][]
+---@param wires [uint, defines.wire_connector_id, uint, defines.wire_connector_id][]
 ---@param dedupe {[string]: boolean}
 ---@param a uint
 ---@param a_connector defines.wire_connector_id
@@ -308,7 +309,8 @@ local function compile(
 			end
 		elseif entity_name == constants.pin_name then
 			-- Store pin in lookup table for later resolution.
-			local ic_index, pin_number = get_pin_info_from_tags(bp_entity.tags)
+			local ic_index, pin_number =
+				get_pin_info_from_tags(bp_entity.tags or EMPTY)
 			if ic_index and pin_number then
 				local bp_ic = bp_ics[ic_index]
 				if not bp_ic then
@@ -329,7 +331,7 @@ local function compile(
 	local pin_remap = {}
 	for bp_index, pin_map in pairs(bp_ics) do
 		-- Compile embbeded IC.
-		local bp_entity = bp_entities[bp_index]
+		local bp_entity = bp_entities[bp_index] --[[@as BlueprintEntity]]
 		local ic_blueprint_string, nested_initial_options =
 			get_ic_info_from_tags(bp_entity.tags)
 		if not ic_blueprint_string then goto continue end
