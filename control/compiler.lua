@@ -12,8 +12,10 @@ local next = next
 local type = type
 local min = math.min
 local max = math.max
+local floor = math.floor
 local tconcat = table.concat
 local sformat = string.format
+local tostring = tostring
 local EMPTY = tlib.EMPTY
 
 local lib = {}
@@ -73,10 +75,19 @@ end
 
 ---@param pos MapPosition
 ---@return string
-local function get_option_key(pos)
+local function get_option_key_from_position(pos)
 	local x = pos.x or pos[1] or 0
 	local y = pos.y or pos[2] or 0
 	return sformat("%.2f,%.2f", x, y)
+end
+
+---@param option_def DieShrink.OptionDefinition?
+---@param pos MapPosition
+---@return string key
+local function get_option_key(option_def, pos)
+	local option_id = option_def and option_def.key
+	if option_id then return tostring(option_id) end
+	return get_option_key_from_position(pos)
 end
 
 ---@param wires [uint, defines.wire_connector_id, uint, defines.wire_connector_id][]
@@ -291,7 +302,7 @@ local function compile(
 			if option_def and option_def.type then
 				local combinator_index = #result_entities + 1
 				local position = get_next_position()
-				local option_key = get_option_key(bp_entity.position)
+				local option_key = get_option_key(option_def, bp_entity.position)
 				option_def.key = option_key
 				local option_choice = initial_options[option_key]
 				local param = {
