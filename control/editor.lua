@@ -217,7 +217,6 @@ local function create_editor_surface(session)
 	else
 		radar.operable = false
 		radar.destructible = false
-		radar.minable = false
 	end
 
 	return surface
@@ -560,8 +559,7 @@ event.bind(
 ---@field ic DieShrink.IC The IC being edited in this session.
 ---@field surface LuaSurface The editor surface for this session.
 ---@field labels {[int64]: DieShrink.LabeledEntityInfo} The entities with labels in this editor session.
-local EditorSession = class("DieShrink.EditorSession")
-_G.EditorSession = EditorSession
+EditorSession = class("DieShrink.EditorSession")
 
 ---@param player LuaPlayer
 ---@param ic DieShrink.IC
