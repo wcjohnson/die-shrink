@@ -98,6 +98,34 @@ local function get_editor_session_by_surface(surface)
 		and storage.editor_sessions[owner_session_id]
 end
 
+---@param entity LuaEntity
+---@param thing_id ThingID
+---@return string?
+local function assign_unique_option_key(entity, thing_id)
+	local used = {}
+	for _, option_entity in
+		ipairs(entity.surface.find_entities_filtered({
+			name = constants.option_name,
+		}))
+	do
+		---@type nil, things.ThingSummary?
+		local _, option_thing = remote.call("things", "get", option_entity)
+		if option_thing and option_thing.id ~= thing_id then
+			local key = (option_thing.tags or EMPTY)["key"]
+			if key then used[tostring(key)] = true end
+		end
+	end
+
+	local next_key = 1
+	while used[tostring(next_key)] do
+		next_key = next_key + 1
+	end
+
+	local next_key_str = tostring(next_key)
+	remote.call("things-tags-v1", "set_tag", thing_id, "key", next_key_str)
+	return next_key_str
+end
+
 ---@param entity_name string
 ---@param player LuaPlayer?
 ---@param position MapPosition?
@@ -695,6 +723,13 @@ event.bind(
 		strace.trace("die-shrink-on_editor_thing_initialized", ev)
 		if ev.thing_name == constants.pad_name then
 			session:create_label(ev, "pad")
+		elseif ev.thing_name == constants.option_name then
+			-- Assign a unique option key to new option entities.
+			if not ev.from_blueprint then
+				if (not ev.tags) or not ev.tags.key then
+					assign_unique_option_key(entity, ev.id)
+				end
+			end
 		end
 	end
 )
