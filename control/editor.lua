@@ -9,6 +9,7 @@ local strace = require("lib.core.strace")
 local counters = require("lib.core.counters")
 local tlib = require("lib.core.table")
 local scheduler = require("lib.core.scheduler")
+local pos_lib = require("lib.core.math.pos")
 
 local EMPTY = tlib.EMPTY
 
@@ -53,18 +54,6 @@ local EDITOR_SYSTEM_ENTITY_NAMES = {
 --------------------------------------------------------------------------------
 -- Editor impl
 --------------------------------------------------------------------------------
-
----@param tags Tags?
----@return Tags
-local function shallow_copy_tags(tags)
-	local copy = {}
-	if tags then
-		for key, value in pairs(tags) do
-			copy[key] = value
-		end
-	end
-	return copy
-end
 
 ---@return {[ID]: DieShrink.EditorSession}
 local function get_editor_sessions()
@@ -116,12 +105,18 @@ local function assign_unique_option_key(entity, thing_id)
 		end
 	end
 
-	local next_key = 1
+	local next_key = math.random(1, 1000000)
 	while used[tostring(next_key)] do
-		next_key = next_key + 1
+		next_key = math.random(1, 1000000)
 	end
 
 	local next_key_str = tostring(next_key)
+	strace.trace(
+		"assign_unique_option_key: assigning key",
+		next_key_str,
+		"to thing",
+		thing_id
+	)
 	remote.call("things-tags-v1", "set_tag", thing_id, "key", next_key_str)
 	return next_key_str
 end
@@ -211,9 +206,8 @@ local function create_editor_surface(session)
 		}))
 	do
 		local pos = tile.position
-		if
-			math.abs(pos.x) > EDITOR_SIZE / 2 or math.abs(pos.y) > EDITOR_SIZE / 2
-		then
+		local tpx, tpy = pos_lib.pos_get(pos)
+		if math.abs(tpx) > EDITOR_SIZE / 2 or math.abs(tpy) > EDITOR_SIZE / 2 then
 			tiles[#tiles + 1] = { name = "out-of-map", position = pos }
 		else
 			tiles[#tiles + 1] = { name = tile_name, position = pos }
@@ -298,7 +292,12 @@ local function capture_editor_blueprint(session, surface, force)
 		content = bp.export_stack()
 	end
 	inv.destroy()
-	strace.trace("Captured blueprint", captured_entities)
+	strace.trace(
+		"Captured blueprint",
+		function()
+			return serpent.line(captured_entities, { maxlevel = 10, nocode = true })
+		end
+	)
 	strace.trace("--- CAPTURE_EDITOR_BLUEPRINT DONE")
 	return content
 end
@@ -445,9 +444,7 @@ local function save_editor_session(session_id)
 		strace.trace("Saving ic tags", ic.thing_id, "with blueprint", blueprint)
 		remote.call("things", "set_tag", ic.thing_id, "blueprint", blueprint)
 	else
-		local tags = shallow_copy_tags(thing.tags)
-		tags.blueprint = nil
-		set_error = remote.call("things", "set_tags", ic.thing_id, tags)
+		remote.call("things", "set_tag", ic.thing_id, "blueprint", nil)
 	end
 end
 

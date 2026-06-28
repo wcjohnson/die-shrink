@@ -122,7 +122,10 @@ lib.OptionUi = relm.define("OptionUi", function(props)
 				value = current_def and current_def.type,
 				on_change = function(_, new_mode)
 					if not new_mode then return end
-					session:set_option_definition(thing_id, { type = new_mode })
+					session:set_option_definition(
+						thing_id,
+						{ type = new_mode, key = current_def.key }
+					)
 				end,
 			}),
 		}),
