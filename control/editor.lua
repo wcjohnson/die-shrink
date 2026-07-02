@@ -612,7 +612,6 @@ function EditorSession:create_label(thing, type)
 		thing_id = thing.id,
 		type = type,
 	}
-	strace.trace("create_label", thing, type)
 	self.labels[thing.id] = label_info
 	self:update_label(thing)
 	return label_info

@@ -3,38 +3,7 @@ local relm = require("lib.core.relm.relm")
 local event = require("lib.core.event")
 
 relm.bootstrap_with_core_events(event)
-
-local stringify = strace.stringify
-local format_tick_relative =
-	require("lib.core.math.numeric").format_tick_relative
-local select = select
-
-strace.set_handler(function(level, ...)
-	local frame = game.ticks_played
-	local cat_tbl = {
-		"[",
-		frame,
-		format_tick_relative(frame, 0),
-		strace.level_to_string[level],
-		"]",
-	}
-	strace.foreach(function(key, value, ...)
-		if key == "level" then
-		-- skip
-		elseif key == "message" then
-			cat_tbl[#cat_tbl + 1] = stringify(value)
-			for i = 1, select("#", ...) do
-				cat_tbl[#cat_tbl + 1] = stringify(select(i, ...))
-			end
-		else
-			cat_tbl[#cat_tbl + 1] = " "
-			cat_tbl[#cat_tbl + 1] = tostring(key)
-			cat_tbl[#cat_tbl + 1] = "="
-			cat_tbl[#cat_tbl + 1] = stringify(value)
-		end
-	end, level, ...)
-	log(table.concat(cat_tbl, " "))
-end)
+strace.set_handler(strace.standard_log_handler)
 
 local entities_lib = require("lib.core.entities")
 
@@ -51,3 +20,18 @@ require("control.ui.option")
 -- Enable support for the Global Variable Viewer debugging mod, if it is
 -- installed.
 if script.active_mods["gvv"] then require("__gvv__.gvv")() end
+
+-- UI pos reset
+commands.add_command(
+	"die-shrink-reset-ui",
+	"Reset the UI position for the Die Shrink mod.",
+	function(x)
+		local player_index = x.player_index
+		if not player_index then return end
+		local player_data = storage.players[player_index]
+		if not player_data then return end
+
+		player_data.editor_window_position = nil
+		player_data.ic_window_position = nil
+	end
+)

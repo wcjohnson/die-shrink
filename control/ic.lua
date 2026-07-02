@@ -19,8 +19,8 @@ local EMPTY = tlib.EMPTY
 ---@field alive boolean
 ---@field n_pins uint
 ---@field pin_labels {[uint]: string} Labels for pins, indexed by pin number
----@field option_definitions {string: [DieShrink.OptionDefinition, uint]}
----@field option_choices {string: DieShrink.OptionChoice}
+---@field option_definitions {[string]: [DieShrink.OptionDefinition, uint]}
+---@field option_choices {[string]: DieShrink.OptionChoice}
 ---@field linked? DieShrink.LinkerResult Linker result for this IC.
 local IC = class("DieShrink.IC")
 _G.IC = IC
@@ -39,7 +39,7 @@ function IC:new(thing_id)
 		ics = {}
 		storage.ics = ics
 	end
-	ics[thing_id] = obj
+	ics[thing_id] = obj --[[@as DieShrink.IC]]
 	return obj
 end
 
@@ -101,7 +101,7 @@ function IC:link(force_recompile)
 	local pin_entities = tlib.t_map_t(
 		children,
 		function(key, child) return tonumber(key), child.entity end
-	) --[[@as table<uint, LuaEntity>]]
+	)
 	if #pin_entities ~= self.n_pins then
 		strace.error(
 			"Number of child entities",
