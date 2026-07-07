@@ -97,13 +97,17 @@ local function devoid_pin_thing(child_id, child_entity)
 end
 
 ---Check an IC for correct number and placement of pins, creating or destroying pin entities as needed.
----@param parent things.ThingSummary
+---@param parent things.ThingShortSummary
 ---@param n_pins 0|2|4|8|16
 ---@param ic DieShrink.IC
 function _G.check_pins(parent, n_pins, ic)
 	local pin_layout = pin_layouts[n_pins]
 	if not pin_layout then
 		error("LOGIC ERROR: invalid number of pins: " .. n_pins)
+		return
+	end
+	if not parent.entity then
+		error("LOGIC ERROR: entity is nil for thing " .. parent.id)
 		return
 	end
 
@@ -115,7 +119,7 @@ function _G.check_pins(parent, n_pins, ic)
 	local _, children = remote.call("things", "get_children", parent.id)
 	for i = 1, n_pins do
 		local pin_index = tostring(i)
-		local pin_offset = pin_layout[i]
+		local pin_offset = pin_layout[i] --[[@as MapPosition]]
 		local child = children and children[pin_index]
 
 		if (not child) and child_should_live then

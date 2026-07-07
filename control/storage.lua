@@ -1,9 +1,7 @@
 local ps_lib = require("control.player-state")
 
 ---@alias PlayerIndex uint
----@alias SurfaceIndex uint
 ---@alias ThingID int64
----@alias UnitNumber int64
 ---@alias ID int64
 
 ---@class DieShrink.Storage
@@ -33,6 +31,7 @@ end
 ---@return DieShrink.IC?
 function _G.get_ic_state(thing_id) return storage.ics and storage.ics[thing_id] end
 
+---@return DieShrink.IC
 function _G.get_or_create_ic_state(thing_id)
 	local ics = storage.ics
 	if not ics then
@@ -41,7 +40,9 @@ function _G.get_or_create_ic_state(thing_id)
 	end
 	local ic = ics[thing_id]
 	if ic then return ic end
+	-- This is defined...
+	---@diagnostic disable-next-line: undefined-global
 	ic = IC:new(thing_id)
 	ics[thing_id] = ic
-	return ic
+	return ic --[[@as DieShrink.IC]]
 end

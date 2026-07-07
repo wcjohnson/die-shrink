@@ -21,7 +21,9 @@ local pin_pictures = {
 ---@type data.WireConnectionPoint
 local ZERO_CONNECTION_POINT = {
 	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	wire = { green = { 0, 0 }, red = { 0, 0 } },
+	---@diagnostic disable-next-line: missing-fields
 	shadow = { green = { 0, 0 }, red = { 0, 0 } },
 }
 
@@ -50,8 +52,12 @@ local pin = {
 	-- EntityPrototype
 	icon = __GRAPHICS_PATH__ .. "icon-jumper-wire.png",
 	icon_size = 256,
+	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	collision_box = { { -0.1, -0.1 }, { 0.1, 0.1 } },
 	collision_mask = { layers = {} },
+	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	selection_box = { { -0.1, -0.1 }, { 0.1, 0.1 } },
 	fast_replaceable_group = nil,
 	flags = {

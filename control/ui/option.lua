@@ -79,8 +79,6 @@ end)
 lib.OptionUi = relm.define("OptionUi", function(props)
 	local root_id = props.root_id
 	local player_index = props.player_index
-	local player = game.get_player(player_index)
-	if (not player) or not player.valid then return end
 	local session = props.session --[[@as DieShrink.EditorSession]]
 	local ic = props.ic --[[@as DieShrink.IC]]
 	local thing_id = props.thing_id
@@ -94,6 +92,8 @@ lib.OptionUi = relm.define("OptionUi", function(props)
 	ultros.use_auto_center_on_open()
 	ultros.use_close_on_gui_closed(player_index, close_me, false)
 	ultros.use_player_opened(player_index)
+	-- XXX: TYPES: EmmyLua union bug
+	---@diagnostic disable-next-line: missing-fields
 	relm_util.use_event_handler({
 		"dieshrink.player_editor_session_pushed",
 		"dieshrink.player_editor_session_popped",

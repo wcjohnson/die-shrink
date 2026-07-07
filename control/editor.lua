@@ -12,6 +12,7 @@ local scheduler = require("lib.core.scheduler")
 local pos_lib = require("lib.core.math.pos")
 
 local EMPTY = tlib.EMPTY
+local pos_get = pos_lib.pos_get
 
 local EDITOR_SURFACE_PREFIX = "die-shrink-editor-s-"
 local EDITOR_SIZE = 32
@@ -201,12 +202,14 @@ local function create_editor_surface(session)
 	local tiles = {}
 	for _, tile in
 		ipairs(surface.find_tiles_filtered({
+			-- XXX: TYPES: FMTK vector bug
+			---@diagnostic disable-next-line: missing-fields
 			position = { 0, 0 },
 			radius = EDITOR_SIZE + 2,
 		}))
 	do
 		local pos = tile.position
-		local tpx, tpy = pos_lib.pos_get(pos)
+		local tpx, tpy = pos_get(pos)
 		if math.abs(tpx) > EDITOR_SIZE / 2 or math.abs(tpy) > EDITOR_SIZE / 2 then
 			tiles[#tiles + 1] = { name = "out-of-map", position = pos }
 		else
@@ -216,6 +219,8 @@ local function create_editor_surface(session)
 	surface.set_tiles(tiles)
 
 	-- Initial chart
+	-- XXX: TYPES: potential FMTK bug, this can't actually be nil
+	---@diagnostic disable-next-line: need-check-nil
 	session.player.force.chart(surface, EDITOR_CHART_AREA)
 
 	-- Energy source
@@ -275,17 +280,17 @@ local function capture_editor_blueprint(session, surface, force)
 	strace.trace("--- CAPTURE_EDITOR_BLUEPRINT")
 	local inv = game.create_inventory(1)
 	local bp = inv[1]
+
 	bp.set_stack({ name = "blueprint", count = 1 })
-	local entities = bp.create_blueprint({
+	-- Cooperative extract blueprint
+	remote.call("cooperative-blueprinting-v1", "create_blueprint", bp, {
 		surface = surface,
 		force = force,
 		area = EDITOR_BLUEPRINT_AREA,
 	})
 
-	-- Delegate to Things to extract tags for nested objects.
-	remote.call("things", "script_create_blueprint", bp, entities)
-
 	local content = nil
+	-- TODO: this is only used for debug dump, remove.
 	local captured_entities = EMPTY
 	if bp.is_blueprint_setup and bp.get_blueprint_entity_count() > 0 then
 		captured_entities = bp.get_blueprint_entities() or EMPTY
@@ -333,8 +338,7 @@ local function get_recentered_build_position(bp_entities)
 				h = proto.tile_width / 2
 			end
 
-			local px = bp_entity.position.x
-			local py = bp_entity.position.y
+			local px, py = pos_get(bp_entity.position)
 			if not x1 then
 				x1 = px - w / 2
 				y1 = py - h / 2
@@ -386,15 +390,6 @@ local function restore_editor_blueprint(session, surface, force, blueprint)
 		strace.trace("Restoring blueprint entities", entities)
 		local build_position = get_recentered_build_position(entities) or { 0, 0 }
 		strace.trace("Build position", build_position)
-		remote.call(
-			"things",
-			"script_prebuild_blueprint",
-			bp,
-			nil,
-			surface,
-			{ position = build_position, direction = defines.direction.north },
-			defines.build_mode.forced
-		)
 		local build_args = {
 			surface = surface,
 			force = force,
@@ -402,8 +397,17 @@ local function restore_editor_blueprint(session, surface, force, blueprint)
 			build_mode = defines.build_mode.forced,
 			skip_fog_of_war = true,
 		}
-		strace.trace("build_blueprint with build args", build_args)
-		local built = bp.build_blueprint(build_args)
+		strace.trace("cooperative build_blueprint with build args", build_args)
+		local built = remote.call(
+			"cooperative-blueprinting-v1",
+			"build_blueprint",
+			bp,
+			build_args
+		) --[[@as LuaEntity[]?]]
+		if not built then
+			strace.warn("Failed to build blueprint on editor surface", surface.name)
+			return
+		end
 		strace.trace("Built entities", built)
 
 		for _, entity in pairs(built) do
@@ -450,6 +454,8 @@ end
 
 scheduler.register_handler("load_session", function(task)
 	-- Paste blueprint into editor
+	-- XXX: TYPES: EmmyLua doesnt understand the table-unpack here???
+	---@diagnostic disable-next-line: missing-parameter
 	restore_editor_blueprint(table.unpack(task.data))
 end)
 
@@ -479,6 +485,8 @@ local function open_editor_for_ic(player, ic)
 	player.set_controller({
 		type = defines.controllers.remote,
 		surface = surface,
+		-- XXX: TYPES: FMTK vector bug
+		---@diagnostic disable-next-line: missing-fields
 		position = { 0, 0 },
 	})
 	if player.zoom < EDITOR_ENTRY_MIN_ZOOM then
@@ -839,6 +847,7 @@ function _G.close_editor_session(session_id)
 				type = defines.controllers.remote,
 				surface = next_session.surface,
 				-- XXX: TYPES: FMTK numeric vector bug
+				---@diagnostic disable-next-line: missing-fields
 				position = { 0, 0 },
 			})
 			if player.zoom < EDITOR_ENTRY_MIN_ZOOM then

@@ -9,6 +9,10 @@ local pos_add = pos_lib.pos_add
 local pos_normalize = pos_lib.pos_normalize
 local pos_scale = pos_lib.pos_scale
 local dir_from = pos_lib.dir_from
+local tonumber = tonumber
+local floor = math.floor
+local pairs = pairs
+local next = next
 
 local lib = {}
 
@@ -22,12 +26,13 @@ local PlayerState = class("DieShrink.PlayerState")
 lib.PlayerState = PlayerState
 
 ---@param player_index uint
+---@return DieShrink.PlayerState
 function PlayerState:new(player_index)
 	local instance = {}
 	setmetatable(instance, self)
 	instance.player_index = player_index
 	instance.editor_session_stack = {}
-	return instance
+	return instance --[[@as DieShrink.PlayerState]]
 end
 
 ---@param id ID
@@ -183,6 +188,7 @@ function PlayerState:render_pin_labels(parent, children)
 		_, children = remote.call("things", "get_children", parent.id)
 	end
 	if not children then return end
+	---@type {[int|string]: string}
 	local labels = BASE_LABELS
 	local ic = get_ic_state(parent.id)
 	if ic and ic.pin_labels and next(ic.pin_labels) then
@@ -192,12 +198,12 @@ function PlayerState:render_pin_labels(parent, children)
 	self:clear_pin_labels()
 	local ros = {}
 	for index, child in pairs(children) do
-		local nindex = tonumber(index)
+		local nindex = floor(tonumber(index) or 0)
 		local entity = child.entity
 		if entity then
 			local text = labels[nindex] or labels[index] or BASE_LABELS[nindex] or "?"
 			local child_pos = entity.position
-			local dir = math.floor(dir_from(parent_pos, child_pos) / 2) + 1
+			local dir = floor(dir_from(parent_pos, child_pos) / 2) + 1
 			local orientations = (#text > 1) and custom_dir_orientations
 				or default_dir_orientations
 			local offsets = (#text > 1) and custom_dir_offsets or default_dir_offsets

@@ -65,7 +65,7 @@ lib.IcUi = relm.define("IcUi", function(props)
 	local option_choices = ic.option_choices or {}
 	local option_defs = ic.option_definitions or {}
 
-	if (not player) or not player.valid then return end
+	if (not player) or not player.valid then return nil end
 
 	-- Window management
 	local function close_me() relm.root_destroy(root_id) end

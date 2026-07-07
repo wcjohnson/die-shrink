@@ -45,10 +45,14 @@ local base_prototype = {
 		"hide-alt-info",
 	},
 	collision_mask = { layers = {} },
+	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	collision_box = {
 		{ -TINY_BOX_SIZE, -TINY_BOX_SIZE },
 		{ TINY_BOX_SIZE, TINY_BOX_SIZE },
 	},
+	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	selection_box = { { -0.01, -0.01 }, { 0.01, 0.01 } },
 	minable = nil,
 	selectable_in_game = false,
@@ -162,10 +166,14 @@ local pad_connector = {
 		"hide-alt-info",
 	},
 	collision_mask = { layers = {} },
+	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	collision_box = {
 		{ -TINY_BOX_SIZE, -TINY_BOX_SIZE },
 		{ TINY_BOX_SIZE, TINY_BOX_SIZE },
 	},
+	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	selection_box = { { -0.01, -0.01 }, { 0.01, 0.01 } },
 	minable = nil,
 	selectable_in_game = false,

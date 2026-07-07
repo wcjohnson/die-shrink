@@ -50,6 +50,7 @@ function IC:apply_options()
 		local option_def = option_info[1]
 		local entity_index = option_info[2]
 		local entity = self.linked.entities and self.linked.entities[entity_index]
+		if (not entity) or not entity.valid then goto continue end
 		local choice = self.option_choices and self.option_choices[key]
 		strace.trace(
 			"IC",
@@ -62,6 +63,7 @@ function IC:apply_options()
 			entity
 		)
 		option_lib.apply_option_to_combinator(entity, option_def, choice)
+		::continue::
 	end
 end
 

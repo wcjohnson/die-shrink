@@ -8,7 +8,10 @@
 local tlib = require("lib.core.table")
 local pos_lib = require("lib.core.math.pos")
 
+---@alias InvalidSentinel { valid: false }
+
 local EMPTY = tlib.EMPTY
+---@type InvalidSentinel
 local INVALID_SENTINEL = { valid = false }
 
 local pos_add = pos_lib.pos_add
@@ -18,9 +21,9 @@ local lib = {}
 local RED = defines.wire_connector_id.circuit_red
 local GREEN = defines.wire_connector_id.circuit_green
 
----@param from_entity LuaEntity
+---@param from_entity LuaEntity | InvalidSentinel
 ---@param from_connector defines.wire_connector_id
----@param to_entity LuaEntity
+---@param to_entity LuaEntity | InvalidSentinel
 ---@param to_connector defines.wire_connector_id
 ---@return boolean
 local function connect_entities(
@@ -37,9 +40,9 @@ local function connect_entities(
 	return from_wc.connect_to(to_wc, false, defines.wire_origin.script)
 end
 
----@param from_entity LuaEntity
+---@param from_entity LuaEntity | InvalidSentinel
 ---@param from_connector defines.wire_connector_id
----@param to_entity LuaEntity
+---@param to_entity LuaEntity | InvalidSentinel
 ---@param to_connector defines.wire_connector_id
 local function disconnect_entities(
 	from_entity,
@@ -56,7 +59,7 @@ local function disconnect_entities(
 end
 
 ---@class DieShrink.LinkerResult
----@field entities LuaEntity[] Real world entities created by the linker.
+---@field entities (LuaEntity | InvalidSentinel)[] Real world entities created by the linker.
 ---@field pin_wires [LuaEntity,defines.wire_connector_id,LuaEntity,defines.wire_connector_id][] List of wires created by the linker for the IC's pins.
 
 ---Create entities and wire connections described by `compiled`.
@@ -67,6 +70,7 @@ end
 ---@param pin_entities {[uint]: LuaEntity} Mapping of external IC pin number to the real world entity representing that pin's connection point.
 ---@return DieShrink.LinkerResult
 function lib.link(compiled, surface, force, position, pin_entities)
+	---@type (LuaEntity | InvalidSentinel)[]
 	local result_entities = {}
 	local result_pin_wires = {}
 
@@ -106,7 +110,12 @@ function lib.link(compiled, surface, force, position, pin_entities)
 		local b_connector = wire[4]
 		local a_entity = result_entities[a_idx]
 		local b_entity = result_entities[b_idx]
-		connect_entities(a_entity, a_connector, b_entity, b_connector)
+		connect_entities(
+			a_entity --[[@cast -?]],
+			a_connector,
+			b_entity --[[@cast -?]],
+			b_connector
+		)
 	end
 
 	-- 3) Connect external pins to compiled pad connectors.

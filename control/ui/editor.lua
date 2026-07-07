@@ -19,10 +19,10 @@ local lib = {}
 lib.EditorUi = relm.define("EditorUi", function(props)
 	local root_id = props.root_id
 	local player_index = props.player_index
-	local player = game.get_player(player_index)
-	if (not player) or not player.valid then return end
+	local player = game and game.get_player(player_index)
+	if (not player) or not player.valid then return nil end
 	local player_state = get_player_state(player_index)
-	if not player_state then return end
+	if not player_state then return nil end
 	local session = props.session --[[@as DieShrink.EditorSession]]
 	local ic = session.ic --[[@as DieShrink.IC]]
 	local ic_id = ic.thing_id

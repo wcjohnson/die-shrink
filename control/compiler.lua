@@ -260,7 +260,7 @@ local function compile(
 				"coming from bp_index",
 				bp_index
 			)
-			result_entities[combinator_index] = param
+			result_entities[combinator_index] = param --[[@as LuaSurface.create_entity_param]]
 			bp_to_compiled[bp_index] = combinator_index
 		elseif entity_name == constants.pad_name then
 			-- Create and map pad connector.
@@ -276,7 +276,7 @@ local function compile(
 					name = PAD_CONNECTOR_NAME,
 					position = get_next_position(),
 					direction = bp_entity.direction,
-				}
+				} --[[@as LuaSurface.create_entity_param]]
 				bp_to_compiled[bp_index] = connector_index
 				add_pad_mapping(result.pad_map, pin_number, connector_index)
 				strace.trace(
@@ -314,7 +314,7 @@ local function compile(
 						option_choice
 					),
 				}
-				result_entities[combinator_index] = param
+				result_entities[combinator_index] = param --[[@as LuaSurface.create_entity_param]]
 				bp_to_compiled[bp_index] = combinator_index
 				result.options[option_key] = { option_def, combinator_index }
 			end

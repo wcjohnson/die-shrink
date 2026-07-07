@@ -1,3 +1,4 @@
 learning/**
 .luarc.json
 .emmyrc.json
+.vscode/settings.json

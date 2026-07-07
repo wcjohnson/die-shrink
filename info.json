@@ -7,7 +7,7 @@
   "homepage": "https://github.com/wcjohnson/die-shrink",
   "description": "Create small, efficient circuit units containing many combinators.",
   "factorio_version": "2.1",
-  "dependencies": [ "base >= 2.1.7", "0-things >= 0.3.1" ],
+  "dependencies": [ "base >= 2.1.7", "0-things >= 0.5.0" ],
   "package": {
     "git_publish_branch": "main",
     "ignore": [ "crowdin.yml", "stylua.toml", "tests/**", "doc/**" ],

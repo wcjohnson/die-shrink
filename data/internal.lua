@@ -82,7 +82,9 @@ data:extend({ energy_source })
 ---@type data.WireConnectionPoint
 local ZERO_CONNECTION_POINT = {
 	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	wire = { green = { 0, 0 }, red = { 0, 0 } },
+	---@diagnostic disable-next-line: missing-fields
 	shadow = { green = { 0, 0 }, red = { 0, 0 } },
 }
 
@@ -93,6 +95,7 @@ local pad_sprite = {
 	width = 83,
 	scale = 0.5,
 	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	shift = { 0.0078125, 0.09375 },
 	tint = { 1, 1, 1, 1 },
 }

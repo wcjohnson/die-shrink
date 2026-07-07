@@ -35,6 +35,8 @@ local ic = {
 	-- EntityPrototype
 	icon = __GRAPHICS_PATH__ .. "ic-icon-128.png",
 	icon_size = 128,
+	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	collision_box = { { -0.45, -0.45 }, { 0.45, 0.45 } },
 	collision_mask = {
 		layers = {
@@ -44,6 +46,8 @@ local ic = {
 			water_tile = true,
 		},
 	},
+	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	selection_box = { { -0.5, -0.5 }, { 0.5, 0.5 } },
 	flags = {
 		"player-creation",
@@ -91,7 +95,11 @@ local power_consumer = {
 
 	-- EntityPrototype
 	minable = nil,
+	-- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	collision_box = { { -0.01, -0.01 }, { 0.01, 0.01 } },
+	--- XXX: TYPES: FMTK vector type issue
+	---@diagnostic disable-next-line: missing-fields
 	selection_box = { { -0.01, -0.01 }, { 0.01, 0.01 } },
 	max_health = 1000,
 	collision_mask = { layers = {} },
