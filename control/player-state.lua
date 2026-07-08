@@ -223,4 +223,6 @@ function PlayerState:render_pin_labels(parent, children)
 	self.pin_labels = ros
 end
 
+-- TODO: on player destroyed, remove player state from storage
+
 return lib

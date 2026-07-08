@@ -14,10 +14,7 @@ data:extend({
 	{ type = "custom-event", name = "die-shrink-on_initialized" },
 	{ type = "custom-event", name = "die-shrink-on_status" },
 	{ type = "custom-event", name = "die-shrink-on_orientation_changed" },
-	{ type = "custom-event", name = "die-shrink-on_children_normalized" },
 	{ type = "custom-event", name = "die-shrink-on_tags_changed" },
-	{ type = "custom-event", name = "die-shrink-on_pin_status" },
-	{ type = "custom-event", name = "die-shrink-on_pin_immediate_voided" },
 	{ type = "custom-event", name = "die-shrink-on_editor_thing_initialized" },
 	{ type = "custom-event", name = "die-shrink-on_editor_thing_tags_changed" },
 	{
@@ -37,7 +34,6 @@ local ic_registration = {
 	custom_events = {
 		on_initialized = "die-shrink-on_initialized",
 		on_status = "die-shrink-on_status",
-		on_children_normalized = "die-shrink-on_children_normalized",
 		on_orientation_changed = "die-shrink-on_orientation_changed",
 		on_tags_changed = "die-shrink-on_tags_changed",
 	},
@@ -48,12 +44,7 @@ thing_registrations["die-shrink-ic"] = ic_registration
 local pin_registration = {
 	name = "die-shrink-pin",
 	intercept_construction = false,
-	no_garbage_collection = true,
 	allow_in_cursor = "never",
-	custom_events = {
-		on_status = "die-shrink-on_pin_status",
-		on_immediate_voided = "die-shrink-on_pin_immediate_voided",
-	},
 }
 thing_registrations["die-shrink-pin"] = pin_registration
 
