@@ -5,6 +5,10 @@ local strace = require("lib.core.strace")
 local orientation_lib = require("lib.core.orientation.orientation")
 local pos_lib = require("lib.core.math.pos")
 local constants = require("lib.constants")
+---@diagnostic disable-next-line: unresolved-require
+local things_client = require("__0-things__.client.client") --[[@as things.client]]
+
+local get_children = things_client.parent_child_v1.get_children
 
 --------------------------------------------------------------------------------
 -- DYNAMIC PIN CREATION
@@ -116,11 +120,12 @@ function _G.check_pins(parent, n_pins, ic)
 	local parent_status = parent.status
 	local child_should_live = parent_status == "real" or parent_status == "ghost"
 
-	local _, children = remote.call("things", "get_children", parent.id)
+	local children = get_children(parent.id)
 	for i = 1, n_pins do
 		local pin_index = tostring(i)
 		local pin_offset = pin_layout[i] --[[@as MapPosition]]
-		local child = children and children[pin_index]
+		local child_info = children and children[pin_index]
+		local child = child_info and child_info.thing
 
 		if (not child) and child_should_live then
 			-- Must create entity and thing

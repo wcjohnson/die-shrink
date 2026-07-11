@@ -3,6 +3,10 @@ local ovl_lib = require("lib.core.overlay")
 local pos_lib = require("lib.core.math.pos")
 local strace = require("lib.core.strace")
 local event = require("lib.core.event")
+---@diagnostic disable-next-line: unresolved-require
+local things_client = require("__0-things__.client.client") --[[@as things.client]]
+
+local get_children = things_client.parent_child_v1.get_children
 
 local pos_new = pos_lib.pos_new
 local pos_add = pos_lib.pos_add
@@ -33,6 +37,11 @@ function PlayerState:new(player_index)
 	instance.player_index = player_index
 	instance.editor_session_stack = {}
 	return instance --[[@as DieShrink.PlayerState]]
+end
+
+function PlayerState:destroy()
+	self:clear_pin_labels()
+	storage.players[self.player_index] = nil
 end
 
 ---@param id ID
@@ -178,15 +187,13 @@ local custom_dir_offsets = {
 	{ 0.15, -0.3 },
 }
 
----@param parent things.ThingSummary
----@param children things.ThingChildrenSummary?
+---@param parent things.ThingShortSummary
+---@param children things.ThingChildrenInfo?
 function PlayerState:render_pin_labels(parent, children)
 	local parent_entity = parent.entity
 	if not parent_entity then return end
 	local parent_pos = parent_entity.position
-	if not children then
-		_, children = remote.call("things", "get_children", parent.id)
-	end
+	if not children then children = get_children(parent.id) end
 	if not children then return end
 	---@type {[int|string]: string}
 	local labels = BASE_LABELS
@@ -223,6 +230,13 @@ function PlayerState:render_pin_labels(parent, children)
 	self.pin_labels = ros
 end
 
--- TODO: on player destroyed, remove player state from storage
+event.bind(
+	defines.events.on_player_left_game,
+	---@param ev EventData.on_player_left_game
+	function(ev)
+		local player_state = get_player_state(ev.player_index)
+		if player_state then player_state:destroy() end
+	end
+)
 
 return lib

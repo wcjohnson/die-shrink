@@ -67,7 +67,7 @@ end
 ---@param surface LuaSurface
 ---@param force LuaForce
 ---@param position MapPosition
----@param pin_entities {[uint]: LuaEntity} Mapping of external IC pin number to the real world entity representing that pin's connection point.
+---@param pin_entities table<uint, LuaEntity> Mapping of external IC pin number to the real world entity representing that pin's connection point.
 ---@return DieShrink.LinkerResult
 function lib.link(compiled, surface, force, position, pin_entities)
 	---@type (LuaEntity | InvalidSentinel)[]

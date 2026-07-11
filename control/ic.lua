@@ -9,7 +9,10 @@ local compiler = require("control.compiler")
 local linker = require("control.linker")
 local option_lib = require("control.option")
 local tlib = require("lib.core.table")
+---@diagnostic disable-next-line: unresolved-require
+local things_client = require("__0-things__.client.client") --[[@as things.client]]
 
+local get_children = things_client.parent_child_v1.get_children
 local type = type
 local tonumber = tonumber
 local EMPTY = tlib.EMPTY
@@ -95,11 +98,12 @@ function IC:link(force_recompile)
 	local option_choices = thing.tags and thing.tags.option --[[@as DieShrink.OptionChoices]]
 		or {}
 	self.option_choices = option_choices
-	local _, children = remote.call("things", "get_children", thing.id)
+	local children = get_children(thing.id)
 	if not children then
 		strace.error("IC", self.thing_id, "is missing children")
 		return
 	end
+	---@type table<uint, LuaEntity>
 	local pin_entities = tlib.t_map_t(
 		children,
 		function(key, child) return tonumber(key), child.entity end
