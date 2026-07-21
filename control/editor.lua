@@ -10,7 +10,12 @@ local counters = require("lib.core.counters")
 local tlib = require("lib.core.table")
 local scheduler = require("lib.core.scheduler")
 local pos_lib = require("lib.core.math.pos")
+---@diagnostic disable-next-line: unresolved-require
+local things_client = require("__0-things__.client.client") --[[@as things.client]]
 
+local get_tags = things_client.tags_v1.get_tags
+
+local rcall = remote.call --[[@as fun(iface: string, method: string, ...: Any): Any ]]
 local EMPTY = tlib.EMPTY
 local pos_get = pos_lib.pos_get
 
@@ -98,8 +103,8 @@ local function assign_unique_option_key(entity, thing_id)
 			name = constants.option_name,
 		}))
 	do
-		---@type nil, things.ThingSummary?
-		local _, option_thing = remote.call("things", "get", option_entity)
+		local _, option_thing = rcall("things", "get", option_entity)
+		---@cast option_thing things.ThingSummary
 		if option_thing and option_thing.id ~= thing_id then
 			local key = (option_thing.tags or EMPTY)["key"]
 			if key then used[tostring(key)] = true end
@@ -118,7 +123,7 @@ local function assign_unique_option_key(entity, thing_id)
 		"to thing",
 		thing_id
 	)
-	remote.call("things-tags-v1", "set_tag", thing_id, "key", next_key_str)
+	rcall("things-tags-v1", "set_tag", thing_id, "key", next_key_str)
 	return next_key_str
 end
 
@@ -135,7 +140,7 @@ local function notify_not_allowed(entity_name, player, position)
 		position = position,
 		create_at_cursor = not position,
 		color = { r = 1.0, g = 0.35, b = 0.35, a = 1.0 },
-		speed = 60,
+		speed = 4,
 	})
 end
 
@@ -202,8 +207,6 @@ local function create_editor_surface(session)
 	local tiles = {}
 	for _, tile in
 		ipairs(surface.find_tiles_filtered({
-			-- XXX: TYPES: FMTK vector bug
-			---@diagnostic disable-next-line: missing-fields
 			position = { 0, 0 },
 			radius = EDITOR_SIZE + 2,
 		}))
@@ -281,9 +284,11 @@ local function capture_editor_blueprint(session, surface, force)
 	local inv = game.create_inventory(1)
 	local bp = inv[1]
 
+	-- XXX: TYPES: Emmy or fmtk bug
+	---@diagnostic disable-next-line: param-type-mismatch
 	bp.set_stack({ name = "blueprint", count = 1 })
 	-- Cooperative extract blueprint
-	remote.call("cooperative-blueprinting-v1", "create_blueprint", bp, {
+	rcall("cooperative-blueprinting-v1", "create_blueprint", bp, {
 		surface = surface,
 		force = force,
 		area = EDITOR_BLUEPRINT_AREA,
@@ -383,6 +388,8 @@ local function restore_editor_blueprint(session, surface, force, blueprint)
 
 	local inv = game.create_inventory(1)
 	local bp = inv[1]
+	-- XXX: TYPES: Emmy or fmtk bug
+	---@diagnostic disable-next-line: param-type-mismatch
 	bp.set_stack({ name = "blueprint", count = 1 })
 	local import_result = bp.import_stack(blueprint)
 	if import_result ~= 1 then
@@ -485,8 +492,6 @@ local function open_editor_for_ic(player, ic)
 	player.set_controller({
 		type = defines.controllers.remote,
 		surface = surface,
-		-- XXX: TYPES: FMTK vector bug
-		---@diagnostic disable-next-line: missing-fields
 		position = { 0, 0 },
 	})
 	if player.zoom < EDITOR_ENTRY_MIN_ZOOM then
@@ -585,6 +590,7 @@ event.bind(
 ---@class (partial) DieShrink.LabeledEntityInfo
 ---@field entity LuaEntity
 ---@field type string "pad"
+---@field ro? LuaRenderObject
 
 ---@class DieShrink.EditorSession
 ---@field id ID Session identifier.
@@ -632,6 +638,7 @@ function EditorSession:destroy_label(label)
 	self.labels[label.thing_id] = nil
 end
 
+---@param thing things.ThingShortSummary
 function EditorSession:update_label(thing)
 	local label = self.labels[thing.id]
 	if type(label) ~= "table" then return end
@@ -642,7 +649,7 @@ function EditorSession:update_label(thing)
 		return
 	end
 
-	local info = thing.tags or EMPTY
+	local info = get_tags(thing.id) or EMPTY
 	local label_text = info.pin and tostring(info.pin) or "[color=red]!![/color]"
 	if info.label then
 		label_text = label_text .. ":  " .. tostring(info.label)
@@ -669,29 +676,29 @@ function EditorSession:destroy_labels()
 end
 
 function EditorSession:set_pad_pin(thing_id, pin)
-	remote.call("things-tags-v1", "set_tag", thing_id, "pin", pin)
+	rcall("things-tags-v1", "set_tag", thing_id, "pin", pin)
 end
 
 function EditorSession:get_pad_pin(thing_id)
-	local _, pin = remote.call("things-tags-v1", "get_tag", thing_id, "pin")
+	local _, pin = rcall("things-tags-v1", "get_tag", thing_id, "pin")
 	return pin
 end
 
 function EditorSession:set_pad_label(thing_id, label)
-	remote.call("things-tags-v1", "set_tag", thing_id, "label", label)
+	rcall("things-tags-v1", "set_tag", thing_id, "label", label)
 end
 
 function EditorSession:get_pad_label(thing_id)
-	local _, label = remote.call("things-tags-v1", "get_tag", thing_id, "label")
+	local _, label = rcall("things-tags-v1", "get_tag", thing_id, "label")
 	return label
 end
 
 function EditorSession:set_option_definition(thing_id, definition)
-	remote.call("things-tags-v1", "set_tags", thing_id, definition)
+	rcall("things-tags-v1", "set_tags", thing_id, definition)
 end
 
 function EditorSession:get_option_definition(thing_id)
-	local _, definition = remote.call("things-tags-v1", "get_tags", thing_id)
+	local _, definition = rcall("things-tags-v1", "get_tags", thing_id)
 	return definition
 end
 
@@ -702,6 +709,8 @@ end
 
 event.bind(
 	"dieshrink.editor_session_pad_changed",
+	---@param sess DieShrink.EditorSession
+	---@param thing things.ThingShortSummary
 	function(sess, _, _, thing) sess:update_label(thing) end
 )
 
@@ -846,8 +855,6 @@ function _G.close_editor_session(session_id)
 			player.set_controller({
 				type = defines.controllers.remote,
 				surface = next_session.surface,
-				-- XXX: TYPES: FMTK numeric vector bug
-				---@diagnostic disable-next-line: missing-fields
 				position = { 0, 0 },
 			})
 			if player.zoom < EDITOR_ENTRY_MIN_ZOOM then
