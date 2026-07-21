@@ -200,6 +200,7 @@ end
 function IC:get_icons()
 	local _, value =
 		remote.call("things-tags-v1", "get_tag", self.thing_id, "icons")
+	---@cast value SignalID[]?
 	if type(value) ~= "table" or (not next(value)) then return nil end
 	return value
 end
@@ -386,6 +387,7 @@ event.bind(
 
 event.bind("dieshrink.ic_pins_changed", function(ic)
 	local _, thing = remote.call("things", "get", ic.thing_id)
+	---@cast thing things.ThingSummary?
 	if not thing then return end
 	local n_pins = ic:get_n_pins()
 	remote.call("things", "set_tag", thing.id, "n_pins", n_pins)

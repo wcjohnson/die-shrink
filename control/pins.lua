@@ -176,6 +176,7 @@ event.bind(
 		player_state:clear_pin_labels()
 		if not selected then return end
 		local _, selected_thing = remote.call("things", "get", selected)
+		---@cast selected_thing things.ThingSummary?
 		if
 			not selected_thing
 			or not (
@@ -187,8 +188,10 @@ event.bind(
 		end
 		if selected_thing.name == "die-shrink-pin" then
 			if selected_thing.parent then
-				_, selected_thing =
+				local _, new_selected_thing =
 					remote.call("things", "get", selected_thing.parent[1])
+				---@cast new_selected_thing things.ThingSummary?
+				selected_thing = new_selected_thing
 			else
 				return
 			end

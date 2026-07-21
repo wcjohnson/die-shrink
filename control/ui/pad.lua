@@ -41,8 +41,6 @@ lib.PadUi = relm.define("PadUi", function(props)
 	ultros.use_auto_center_on_open()
 	ultros.use_close_on_gui_closed(player_index, close_me, false)
 	ultros.use_player_opened(player_index)
-	-- XXX: TYPES: GOOD/EVIL type bug again in a different form
-	---@diagnostic disable-next-line: missing-fields
 	relm_util.use_event_handler({
 		"dieshrink.player_editor_session_pushed",
 		"dieshrink.player_editor_session_popped",

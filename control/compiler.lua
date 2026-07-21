@@ -174,6 +174,8 @@ local function compile(
 		strace.trace("Compiling from blueprint string")
 		local inv = game.create_inventory(1)
 		local bp = inv[1]
+		-- XXX: TYPES: Emmy or fmtk bug
+		---@diagnostic disable-next-line: param-type-mismatch
 		bp.set_stack({ name = "blueprint", count = 1 })
 		local import_result = bp.import_stack(bp_entities)
 		if import_result == 1 then
